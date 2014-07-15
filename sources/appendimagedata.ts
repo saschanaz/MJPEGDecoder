@@ -35,12 +35,12 @@
  * SUCH DAMAGE.
  */
 
-interface SourceBuffer {
-    appendImageData(imageData: ImageData, timeStamp: number): void;
-}
-SourceBuffer.prototype.appendImageData = (imageData: ImageData, timeStamp: number) => {
+//interface SourceBuffer {
+//    appendImageData(imageData: ImageData, timeStamp: number): void;
+//}
+//SourceBuffer.prototype.appendImageData = (imageData: ImageData, timeStamp: number) => {
     
-}
+//}
 
 class _H264LosslessEncoder {
     static SPS = [0x00, 0x00, 0x00, 0x01, 0x67, 0x42, 0x00, 0x0A, 0xF8, 0x41, 0xA2];

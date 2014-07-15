@@ -204,17 +204,36 @@ var MJPEG = (function () {
     });
 
     MJPEG.prototype.getFrame = function (index) {
+        var backward = this.getBackwardFrame(index);
+        if (backward)
+            return backward.data;
+        else
+            return;
+    };
+    MJPEG.prototype.getFrameByTime = function (time) {
+        return this.getFrame(this.totalFrames * time / this.duration);
+    };
+
+    MJPEG.prototype.getBackwardFrame = function (index) {
         var i = index;
         while (i >= 0) {
             if (this.frames[i])
-                return this.frames[i];
+                return { index: i, data: this.frames[i] };
             else
                 i--;
         }
         return;
     };
-    MJPEG.prototype.getFrameByTime = function (time) {
-        return this.getFrame(this.totalFrames * time / this.duration);
+
+    MJPEG.prototype.getForwardFrame = function (index) {
+        var i = index;
+        while (i < this.totalFrames) {
+            if (this.frames[i])
+                return { index: i, data: this.frames[i] };
+            else
+                i++;
+        }
+        return;
     };
     return MJPEG;
 })();

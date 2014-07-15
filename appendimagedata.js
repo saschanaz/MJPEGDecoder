@@ -34,9 +34,11 @@
 * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 * SUCH DAMAGE.
 */
-SourceBuffer.prototype.appendImageData = function (imageData, timeStamp) {
-};
-
+//interface SourceBuffer {
+//    appendImageData(imageData: ImageData, timeStamp: number): void;
+//}
+//SourceBuffer.prototype.appendImageData = (imageData: ImageData, timeStamp: number) => {
+//}
 var _H264LosslessEncoder = (function () {
     function _H264LosslessEncoder() {
     }

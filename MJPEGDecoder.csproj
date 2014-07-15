@@ -22,9 +22,9 @@
     <Content Include="web.config" />
   </ItemGroup>
   <ItemGroup>
-    <TypeScriptCompile Include="appendimagedata.ts" />
-    <TypeScriptCompile Include="mjpegreader.ts" />
-    <TypeScriptCompile Include="mp4container.ts" />
+    <TypeScriptCompile Include="sources\appendimagedata.ts" />
+    <TypeScriptCompile Include="sources\mjpegreader.ts" />
+    <TypeScriptCompile Include="sources\mp4container.ts" />
   </ItemGroup>
   <ItemGroup>
     <None Include="web.Debug.config">
@@ -66,6 +66,9 @@
     <TypeScriptRemoveComments>false</TypeScriptRemoveComments>
     <TypeScriptSourceMap>true</TypeScriptSourceMap>
     <TypeScriptModuleKind>AMD</TypeScriptModuleKind>
+    <TypeScriptNoImplicitAny>True</TypeScriptNoImplicitAny>
+    <TypeScriptOutFile>mjpegdecoder.js</TypeScriptOutFile>
+    <TypeScriptGeneratesDeclarations>True</TypeScriptGeneratesDeclarations>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
     <TypeScriptTarget>ES5</TypeScriptTarget>

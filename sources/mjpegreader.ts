@@ -221,16 +221,35 @@ class MJPEG {
     frames: Blob[];
 
     getFrame(index: number) {
+        var backward = this.getBackwardFrame(index);
+        if (backward)
+            return backward.data;
+        else
+            return;
+    }
+    getFrameByTime(time: number) {
+        return this.getFrame(this.totalFrames * time / this.duration);
+    }
+
+    getBackwardFrame(index: number) {
         var i = index;
         while (i >= 0) {
             if (this.frames[i])
-                return this.frames[i];
+                return { index: i, data: this.frames[i] };
             else
                 i--;
         }
         return;
     }
-    getFrameByTime(time: number) {
-        return this.getFrame(this.totalFrames * time / this.duration);
+
+    getForwardFrame(index: number) {
+        var i = index;
+        while (i < this.totalFrames) {
+            if (this.frames[i])
+                return { index: i, data: this.frames[i] };
+            else
+                i++;
+        }
+        return;
     }
 }
