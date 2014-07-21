@@ -144,11 +144,13 @@ class MJPEGReader {
         return promise;
     }
 
-    private static _getLittleEndianedDword(array: Uint8Array, index: number) {
-        var dword = 0;
-        for (var i = 0; i < 4; i++)
-            dword += array[index + i] * Math.pow(256, i);
-        return dword;
+    private static _getLittleEndianedDword(stream: BlobStream) {
+        return new Promise<number>((resolve, reject) => {
+            stream.readBytes<ArrayBuffer>(4).then((result) => {
+                var dataView = new DataView(result.data);
+                resolve(dataView.getUint32(0, true));
+            });
+        });
     }
 }
 

@@ -200,11 +200,13 @@ var MJPEGReader = (function () {
         return promise;
     };
 
-    MJPEGReader._getLittleEndianedDword = function (array, index) {
-        var dword = 0;
-        for (var i = 0; i < 4; i++)
-            dword += array[index + i] * Math.pow(256, i);
-        return dword;
+    MJPEGReader._getLittleEndianedDword = function (stream) {
+        return new Promise(function (resolve, reject) {
+            stream.readBytes(4).then(function (result) {
+                var dataView = new DataView(result.data);
+                resolve(dataView.getUint32(0, true));
+            });
+        });
     };
     return MJPEGReader;
 })();
