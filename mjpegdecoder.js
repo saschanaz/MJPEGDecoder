@@ -153,7 +153,7 @@ var MJPEGReader = (function () {
         return JPEGs;
     };
 
-    MJPEGReader._getTypedData = function (array, structureType, dataName) {
+    MJPEGReader._getTypedData = function (stream, structureType, dataName) {
         var type = this._getFourCC(array, 0);
         if (type === structureType) {
             var name = this._getFourCC(array, 8);
@@ -193,8 +193,11 @@ var MJPEGReader = (function () {
         }
     };
 
-    MJPEGReader._getFourCC = function (array, index) {
-        return String.fromCharCode.apply(null, array.subarray(index, index + 4));
+    MJPEGReader._getFourCC = function (stream) {
+        stream.readBytesAs = "text";
+        var promise = stream.readBytes(4);
+        stream.readBytesAs = "as-is";
+        return promise;
     };
 
     MJPEGReader._getLittleEndianedDword = function (array, index) {

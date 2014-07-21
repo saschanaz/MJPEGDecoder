@@ -94,7 +94,7 @@ class MJPEGReader {
         return JPEGs;
     }
 
-    private static _getTypedData(array: Uint8Array, structureType: string, dataName: string): Uint8Array {
+    private static _getTypedData(stream: BlobStream, structureType: string, dataName: string): Uint8Array {
         var type = this._getFourCC(array, 0);
         if (type === structureType) {
             var name = this._getFourCC(array, 8);
@@ -137,8 +137,11 @@ class MJPEGReader {
         }
     }
 
-    private static _getFourCC(array: Uint8Array, index: number) {
-        return String.fromCharCode.apply(null, array.subarray(index, index + 4))
+    private static _getFourCC(stream: BlobStream) {
+        stream.readBytesAs = "text";
+        var promise = stream.readBytes(4);
+        stream.readBytesAs = "as-is";
+        return promise;
     }
 
     private static _getLittleEndianedDword(array: Uint8Array, index: number) {
