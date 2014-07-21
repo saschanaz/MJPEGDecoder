@@ -1,3 +1,6 @@
 [submodule "submodules/promise"]
 	path = submodules/promise
 	url = https://github.com/taylorhakes/promise-polyfill.git
+[submodule "submodules/streams"]
+	path = submodules/streams
+	url = https://github.com/SaschaNaz/Streams.git
