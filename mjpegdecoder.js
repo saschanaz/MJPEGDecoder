@@ -78,23 +78,25 @@ var _H264LosslessEncoder = (function () {
 var MJPEGReader = (function () {
     function MJPEGReader() {
     }
-    MJPEGReader.read = function (file, onread) {
+    MJPEGReader.read = function (file) {
         var _this = this;
-        var reader = new FileReader();
-        reader.onload = function (e) {
-            var arraybuffer = e.target.result;
-            var array = new Uint8Array(arraybuffer);
+        return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var arraybuffer = e.target.result;
+                var array = new Uint8Array(arraybuffer);
 
-            var aviMJPEG = _this._readRiff(array);
-            var mjpeg = new MJPEG();
-            mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
-            mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
-            mjpeg.width = aviMJPEG.mainHeader.width;
-            mjpeg.height = aviMJPEG.mainHeader.height;
-            mjpeg.frames = aviMJPEG.JPEGs;
-            onread(mjpeg);
-        };
-        reader.readAsArrayBuffer(file);
+                var aviMJPEG = _this._readRiff(array);
+                var mjpeg = new MJPEG();
+                mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
+                mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
+                mjpeg.width = aviMJPEG.mainHeader.width;
+                mjpeg.height = aviMJPEG.mainHeader.height;
+                mjpeg.frames = aviMJPEG.JPEGs;
+                resolve(mjpeg);
+            };
+            reader.readAsArrayBuffer(file);
+        });
     };
 
     MJPEGReader._readRiff = function (array) {

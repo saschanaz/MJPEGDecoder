@@ -1,4 +1,4 @@
-﻿declare class _H264LosslessEncoder {
+declare class _H264LosslessEncoder {
     static SPS: number[];
     static PPS: number[];
     static sliceHeader: number[];
@@ -25,7 +25,7 @@ interface EqualityData {
     isEqual: boolean;
 }
 declare class MJPEGReader {
-    static read(file: Blob, onread: (mjpeg: MJPEG) => any): void;
+    static read(file: Blob): Promise<MJPEG>;
     private static _readRiff(array);
     private static _readHdrl(array);
     private static _readAVIMainHeader(array);

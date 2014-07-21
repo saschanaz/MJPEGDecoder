@@ -25,6 +25,7 @@
     <TypeScriptCompile Include="sources\appendimagedata.ts" />
     <TypeScriptCompile Include="sources\mjpegreader.ts" />
     <TypeScriptCompile Include="sources\mp4container.ts" />
+    <TypeScriptCompile Include="submodules\es6-promises.d.ts" />
   </ItemGroup>
   <ItemGroup>
     <None Include="web.Debug.config">
