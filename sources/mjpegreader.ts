@@ -19,10 +19,6 @@ interface AVIOldIndex {
     byteOffset: number;
     byteLength: number;
 }
-interface EqualityData {
-    currentTime: number;
-    isEqual: boolean;
-}
 class MJPEGReader {
     static read(file: Blob) {
         return new Promise<MJPEG>((resolve, reject) => {
