@@ -81,25 +81,20 @@ var MJPEGReader = (function () {
     MJPEGReader.read = function (file) {
         var _this = this;
         return new Promise(function (resolve, reject) {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                var arraybuffer = e.target.result;
-                var array = new Uint8Array(arraybuffer);
+            var stream = new BlobStream(file);
 
-                var aviMJPEG = _this._readRiff(array);
-                var mjpeg = new MJPEG();
-                mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
-                mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
-                mjpeg.width = aviMJPEG.mainHeader.width;
-                mjpeg.height = aviMJPEG.mainHeader.height;
-                mjpeg.frames = aviMJPEG.JPEGs;
-                resolve(mjpeg);
-            };
-            reader.readAsArrayBuffer(file);
+            var aviMJPEG = _this._readRiff(stream);
+            var mjpeg = new MJPEG();
+            mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
+            mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
+            mjpeg.width = aviMJPEG.mainHeader.width;
+            mjpeg.height = aviMJPEG.mainHeader.height;
+            mjpeg.frames = aviMJPEG.JPEGs;
+            resolve(mjpeg);
         });
     };
 
-    MJPEGReader._readRiff = function (array) {
+    MJPEGReader._readRiff = function (stream) {
         var riff = this._getTypedData(array, "RIFF", "AVI ");
         var targetDataArray = riff;
         var hdrlList = this._readHdrl(targetDataArray);

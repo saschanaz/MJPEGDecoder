@@ -22,25 +22,20 @@ interface AVIOldIndex {
 class MJPEGReader {
     static read(file: Blob) {
         return new Promise<MJPEG>((resolve, reject) => {
-            var reader = new FileReader();
-            reader.onload = (e) => {
-                var arraybuffer: ArrayBuffer = e.target.result;
-                var array = new Uint8Array(arraybuffer);
+            var stream = new BlobStream(file);
 
-                var aviMJPEG = this._readRiff(array);
-                var mjpeg = new MJPEG();
-                mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
-                mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
-                mjpeg.width = aviMJPEG.mainHeader.width;
-                mjpeg.height = aviMJPEG.mainHeader.height;
-                mjpeg.frames = aviMJPEG.JPEGs;
-                resolve(mjpeg);
-            };
-            reader.readAsArrayBuffer(file);
+            var aviMJPEG = this._readRiff(stream);
+            var mjpeg = new MJPEG();
+            mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
+            mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
+            mjpeg.width = aviMJPEG.mainHeader.width;
+            mjpeg.height = aviMJPEG.mainHeader.height;
+            mjpeg.frames = aviMJPEG.JPEGs;
+            resolve(mjpeg);
         });
     }
 
-    private static _readRiff(array: Uint8Array) {
+    private static _readRiff(stream: BlobStream) {
         var riff = this._getTypedData(array, "RIFF", "AVI ");
         var targetDataArray = riff;
         var hdrlList = this._readHdrl(targetDataArray);
