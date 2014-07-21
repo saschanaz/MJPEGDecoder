@@ -138,10 +138,13 @@ class MJPEGReader {
     }
 
     private static _getFourCC(stream: BlobStream) {
-        stream.readBytesAs = "text";
-        var promise = stream.readBytes(4);
-        stream.readBytesAs = "as-is";
-        return promise;
+        return new Promise<string>((resolve, reject) => {
+            stream.readBytesAs = "text";
+            var promise = stream.readBytes<string>(4).then((result) => {
+                resolve(result.data);
+            });
+            stream.readBytesAs = "as-is";
+        });
     }
 
     private static _getLittleEndianedDword(stream: BlobStream) {
