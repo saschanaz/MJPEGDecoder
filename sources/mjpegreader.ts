@@ -109,7 +109,7 @@ class MJPEGReader {
             width: 0,
             height: 0
         }
-        return this._getNonTypedData(stream, "avih")
+        return this._consumeChunkHead(stream, "avih")
             .then((header) => {
                 headerStream = header;
                 return this._getLittleEndianedDword(headerStream);
@@ -143,7 +143,7 @@ class MJPEGReader {
     }
 
     private static _readAVIIndex(stream: BlobStream) {
-        return this._getNonTypedData(stream, "idx1")
+        return this._consumeChunkHead(stream, "idx1")
             .then((indexDataStream) => {
                 var indexes: AVIOldIndex[] = [];
 
@@ -190,42 +190,42 @@ class MJPEGReader {
         var head: AVIGeneralStructure = <any>{};
 
         return this._getFourCC(stream)
-            .then((name) => { // get name
-                head.name = name;
+            .then((nameParam) => { // get name
+                head.name = nameParam;
                 return this._getLittleEndianedDword(stream);
-            }).then((size) => { // get length
-                head.size = size;
-                if (head.name === name)
-                    return this._getFourCC(stream).then((subtypeName) => { // get subtype
-                        if (subtypeName !== subtype)
-                            return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+            }).then((sizeParam) => { // get length
+                head.size = sizeParam;
+                if (head.name !== name)
+                    return Promise.reject(new Error("Incorrect AVI format."));
 
-                        if (sliceContainingData)
-                            head.slicedData = stream.slice(0, size - 4);
-                        return Promise.resolve(head);    
-                    });
-                else if (head.name === "JUNK") {
-                    return stream.seek(stream.byteOffset + size - 8)
-                        .then(() => this._consumeStructureHead(stream, name, subtype));
-                }
-                else
-                    return Promise.reject(new Error("Incorrect AVI typed data format."));
+                return this._getFourCC(stream).then((subtypeParam) => { // get subtype
+                    if (subtypeParam !== subtype)
+                        return Promise.reject(new Error("Unexpected name is detected for AVI structure."));
+
+                    if (sliceContainingData)
+                        head.slicedData = stream.slice(stream.byteOffset, stream.byteOffset + sizeParam - 4);
+                    return Promise.resolve(head);    
+                });    
             });
     }
-    private static _getNonTypedData(stream: BlobStream, dataName: string): Promise<BlobStream> {
-        var dataInfo = { name: '' };
+    private static _consumeChunkHead(stream: BlobStream, id: string, sliceContainingData = false): Promise<BlobStream> {
+        var head: AVIGeneralChunk = <any>{};
 
         return this._getFourCC(stream)
-            .then((name) => { // get name
-                dataInfo.name = name;
+            .then((idParam) => { // get id
+                head.id = idParam;
                 return this._getLittleEndianedDword(stream);
-            }).then((length) => { // get length
-                if (dataInfo.name === dataName)
-                    return Promise.resolve(stream.slice(8, 4 + length));
-                else if (dataInfo.name === "JUNK")
-                    return this._getNonTypedData(stream.slice(length), dataName);
+            }).then((sizeParam) => { // get size
+                if (head.id === id) {
+                    if (sliceContainingData)
+                        head.slicedData = stream.slice(stream.byteOffset, stream.byteOffset + sizeParam);
+                    return Promise.resolve(head);
+                }
+                else if (head.id === "JUNK")
+                    return stream.seek(stream.byteOffset + sizeParam)
+                        .then(() => this._consumeChunkHead(stream, id));
                 else
-                    return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+                    return Promise.reject(new Error("Unexpected id is detected for AVI chunk."));
             });
     }
 
