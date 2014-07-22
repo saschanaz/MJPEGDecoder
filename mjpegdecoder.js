@@ -155,7 +155,7 @@ var MJPEGReader = (function () {
 
     MJPEGReader._getTypedData = function (stream, structureType, dataName) {
         var _this = this;
-        var dataInfo = { type: '', length: 0, name: '' };
+        var dataInfo = { type: '', length: 0 };
 
         return this._getFourCC(stream).then(function (type) {
             dataInfo.type = type;
@@ -164,7 +164,7 @@ var MJPEGReader = (function () {
             dataInfo.length = length;
             if (dataInfo.type === structureType)
                 return _this._getFourCC(stream).then(function (name) {
-                    if (dataInfo.name === name)
+                    if (name === dataName)
                         return Promise.resolve(stream.slice(12, 8 + length));
                     else
                         return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
@@ -175,30 +175,21 @@ var MJPEGReader = (function () {
                 return Promise.reject(new Error("Incorrect AVI typed data format."));
         });
     };
-    MJPEGReader._getNonTypedData = function (array, dataName) {
-        var name = this._getFourCC(array, 0);
-        if (name == dataName)
-            return array.subarray(8, 4 + this._getLittleEndianedDword(array, 4));
-        else if (name === "JUNK") {
-            var junkLength = 8 + this._getLittleEndianedDword(array, 4);
-            return this._getNonTypedData(array.subarray(junkLength), dataName);
-        } else
-            throw new Error("Different data name is detected.");
-    };
+    MJPEGReader._getNonTypedData = function (stream, dataName) {
+        var _this = this;
+        var dataInfo = { name: '' };
 
-    MJPEGReader._findMarker = function (array, type, index) {
-        var nextIndex = index;
-        while (true) {
-            var startIndex = Array.prototype.indexOf.apply(array, [0xFF, nextIndex]);
-            if (startIndex == -1)
-                return -1;
-            else {
-                var following = array[startIndex + 1];
-                if (following == type)
-                    return startIndex;
-            }
-            nextIndex = startIndex + 1;
-        }
+        return this._getFourCC(stream).then(function (name) {
+            dataInfo.name = name;
+            return _this._getLittleEndianedDword(stream);
+        }).then(function (length) {
+            if (dataInfo.name === dataName)
+                return Promise.resolve(stream.slice(8, 4 + length));
+            else if (dataInfo.name === "JUNK")
+                return _this._getNonTypedData(stream.slice(length), dataName);
+            else
+                return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+        });
     };
 
     MJPEGReader._getFourCC = function (stream) {

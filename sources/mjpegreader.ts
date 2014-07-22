@@ -95,7 +95,7 @@ class MJPEGReader {
     }
 
     private static _getTypedData(stream: BlobStream, structureType: string, dataName: string): Promise<BlobStream> {
-        var dataInfo = { type: '', length: 0, name: ''};
+        var dataInfo = { type: '', length: 0 };
 
         return this._getFourCC(stream)
             .then((type) => { // get type
@@ -105,7 +105,7 @@ class MJPEGReader {
                 dataInfo.length = length;
                 if (dataInfo.type === structureType)
                     return this._getFourCC(stream).then((name) => { // get name
-                        if (dataInfo.name === name)
+                        if (name === dataName)
                             return Promise.resolve(stream.slice(12, 8 + length));
                         else
                             return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
@@ -117,31 +117,21 @@ class MJPEGReader {
                     return Promise.reject(new Error("Incorrect AVI typed data format."));
             });
     }
-    private static _getNonTypedData(array: Uint8Array, dataName: string): Uint8Array {
-        var name = this._getFourCC(array, 0);
-        if (name == dataName)
-            return array.subarray(8, 4 + this._getLittleEndianedDword(array, 4));
-        else if (name === "JUNK") {
-            var junkLength = 8 + this._getLittleEndianedDword(array, 4);
-            return this._getNonTypedData(array.subarray(junkLength), dataName);
-        }
-        else
-            throw new Error("Different data name is detected.");
-    }
+    private static _getNonTypedData(stream: BlobStream, dataName: string) {
+        var dataInfo = { name: '' };
 
-    private static _findMarker(array: Uint8Array, type: number, index: number) {
-        var nextIndex = index;
-        while (true) {
-            var startIndex = Array.prototype.indexOf.apply(array, [0xFF, nextIndex]);
-            if (startIndex == -1)
-                return -1;
-            else {
-                var following = array[startIndex + 1];
-                if (following == type)
-                    return startIndex;
-            }
-            nextIndex = startIndex + 1;
-        }
+        return this._getFourCC(stream)
+            .then((name) => { // get name
+                dataInfo.name = name;
+                return this._getLittleEndianedDword(stream);
+            }).then((length) => { // get length
+                if (dataInfo.name === dataName)
+                    return Promise.resolve(stream.slice(8, 4 + length));
+                else if (dataInfo.name === "JUNK")
+                    return this._getNonTypedData(stream.slice(length), dataName);
+                else
+                    return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+            });
     }
 
     private static _getFourCC(stream: BlobStream) {
