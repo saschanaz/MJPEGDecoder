@@ -36,16 +36,27 @@ class MJPEGReader {
     }
 
     private static _readRiff(stream: BlobStream) {
-        var riff = this._getTypedData(stream, "RIFF", "AVI ");
-        var targetDataStream = riff;
-        var hdrlList = this._readHdrl(targetDataStream);
-        targetDataStream = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
-        var moviList = this._readMovi(targetDataStream);
-        targetDataStream = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength);//JUNK safe subarray
-        var indexes = this._readAVIIndex(targetDataStream);
-        var exportedJPEG = this._exportJPEG(moviList.dataArray, indexes);
+        var targetDataStream: BlobStream;
 
-        return { mainHeader: hdrlList.mainHeader, JPEGs: exportedJPEG };
+        //return this._getTypedData(stream, "RIFF", "AVI ")
+        //    .then((riff) => {
+        //        targetDataStream = riff;
+        //        return this._readHdrl(targetDataStream);
+        //    }).then((hdrlList) => {
+        //        targetDataStream = stream.slice(hdrlList.dataStream.blob.;
+        //        return this._
+        //    });
+
+        //var riff = this._getTypedData(stream, "RIFF", "AVI ");
+        //var targetDataStream = riff;
+        //var hdrlList = this._readHdrl(targetDataStream);
+        //targetDataStream = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
+        //var moviList = this._readMovi(targetDataStream);
+        //targetDataStream = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength);//JUNK safe subarray
+        //var indexes = this._readAVIIndex(targetDataStream);
+        //var exportedJPEG = this._exportJPEG(moviList.dataArray, indexes);
+
+        //return { mainHeader: hdrlList.mainHeader, JPEGs: exportedJPEG };
     }
 
     private static _readHdrl(stream: BlobStream) {
@@ -136,7 +147,7 @@ class MJPEGReader {
                             }).then(() => {
                                 return this._getLittleEndianedDword(indexDataStream);
                             }).then((offset) => {
-                                index.byteOffset = offset;
+                                index.byteOffset = offset + 4; // ignore 'movi' string
                                 return this._getLittleEndianedDword(indexDataStream);
                             }).then((length) => {
                                 index.byteLength = length;
@@ -151,11 +162,13 @@ class MJPEGReader {
             });
     }
 
-    private static _exportJPEG(moviList: Uint8Array, indexes: AVIOldIndex[]) {
+    private static _exportJPEG(moviList: BlobStream, indexes: AVIOldIndex[]) {
+        // do not +8, 'movi' string was already ignored.
+
         var JPEGs: Blob[] = [];
         for (var i = 0; i < indexes.length; i++) {
             if (indexes[i])
-                JPEGs[i] = new Blob([moviList.subarray(indexes[i].byteOffset + 8, indexes[i].byteOffset + 8 + indexes[i].byteLength)], { type: "image/jpeg" });
+                JPEGs[i] = moviList.blob.slice(indexes[i].byteOffset, indexes[i].byteOffset + indexes[i].byteLength);
         }
         return JPEGs;
     }
