@@ -112,18 +112,18 @@ class MJPEGReader {
         return this._consumeChunkHead(stream, "avih")
             .then((header) => {
                 headerStream = header;
-                return this._getLittleEndianedDword(headerStream);
+                return this._consumeUint32(headerStream);
             }).then((frameIntervalMicroseconds) => {
                 aviMainHeader.frameIntervalMicroseconds = frameIntervalMicroseconds;
                 return headerStream.seek(16);
             }).then(() => {
-                return this._getLittleEndianedDword(headerStream);
+                return this._consumeUint32(headerStream);
             }).then((totalFrames) => {
                 aviMainHeader.totalFrames = totalFrames;
-                return this._getLittleEndianedDword(headerStream);
+                return this._consumeUint32(headerStream);
             }).then((width) => {
                 aviMainHeader.width = width;
-                return this._getLittleEndianedDword(headerStream);
+                return this._consumeUint32(headerStream);
             }).then((height) => {
                 aviMainHeader.height = height;
                 return Promise.resolve(aviMainHeader);
@@ -158,10 +158,10 @@ class MJPEGReader {
                             .then(() => {
                                 return indexDataStream.seek(i * 16 + 8);
                             }).then(() => {
-                                return this._getLittleEndianedDword(indexDataStream);
+                                return this._consumeUint32(indexDataStream);
                             }).then((offset) => {
                                 index.byteOffset = offset + 4; // ignore 'movi' string
-                                return this._getLittleEndianedDword(indexDataStream);
+                                return this._consumeUint32(indexDataStream);
                             }).then((length) => {
                                 index.byteLength = length;
                                 if (length > 0)
@@ -189,16 +189,16 @@ class MJPEGReader {
     private static _consumeStructureHead(stream: BlobStream, name: string, subtype: string, sliceContainingData = false): Promise<BlobStream> {
         var head: AVIGeneralStructure = <any>{};
 
-        return this._getFourCC(stream)
+        return this._consumeFourCC(stream)
             .then((nameParam) => { // get name
                 head.name = nameParam;
-                return this._getLittleEndianedDword(stream);
+                return this._consumeUint32(stream);
             }).then((sizeParam) => { // get length
                 head.size = sizeParam;
                 if (head.name !== name)
                     return Promise.reject(new Error("Incorrect AVI format."));
 
-                return this._getFourCC(stream).then((subtypeParam) => { // get subtype
+                return this._consumeFourCC(stream).then((subtypeParam) => { // get subtype
                     if (subtypeParam !== subtype)
                         return Promise.reject(new Error("Unexpected name is detected for AVI structure."));
 
@@ -211,10 +211,10 @@ class MJPEGReader {
     private static _consumeChunkHead(stream: BlobStream, id: string, sliceContainingData = false): Promise<BlobStream> {
         var head: AVIGeneralChunk = <any>{};
 
-        return this._getFourCC(stream)
+        return this._consumeFourCC(stream)
             .then((idParam) => { // get id
                 head.id = idParam;
-                return this._getLittleEndianedDword(stream);
+                return this._consumeUint32(stream);
             }).then((sizeParam) => { // get size
                 if (head.id === id) {
                     if (sliceContainingData)
@@ -229,7 +229,7 @@ class MJPEGReader {
             });
     }
 
-    private static _getFourCC(stream: BlobStream) {
+    private static _consumeFourCC(stream: BlobStream) {
         return new Promise<string>((resolve, reject) => {
             stream.readBytesAs = "text";
             var promise = stream.readBytes<string>(4).then((result) => {
@@ -239,13 +239,12 @@ class MJPEGReader {
         });
     }
 
-    private static _getLittleEndianedDword(stream: BlobStream) {
-        return new Promise<number>((resolve, reject) => {
-            stream.readBytes<ArrayBuffer>(4).then((result) => {
+    private static _consumeUint32(stream: BlobStream) {
+        return stream.readBytes<ArrayBuffer>(4)
+            .then((result) => {
                 var dataView = new DataView(result.data);
-                resolve(dataView.getUint32(0, true));
+                return dataView.getUint32(0, true);
             });
-        });
     }
 }
 

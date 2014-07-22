@@ -161,18 +161,18 @@ var MJPEGReader = (function () {
         };
         return this._consumeChunkHead(stream, "avih").then(function (header) {
             headerStream = header;
-            return _this._getLittleEndianedDword(headerStream);
+            return _this._consumeUint32(headerStream);
         }).then(function (frameIntervalMicroseconds) {
             aviMainHeader.frameIntervalMicroseconds = frameIntervalMicroseconds;
             return headerStream.seek(16);
         }).then(function () {
-            return _this._getLittleEndianedDword(headerStream);
+            return _this._consumeUint32(headerStream);
         }).then(function (totalFrames) {
             aviMainHeader.totalFrames = totalFrames;
-            return _this._getLittleEndianedDword(headerStream);
+            return _this._consumeUint32(headerStream);
         }).then(function (width) {
             aviMainHeader.width = width;
-            return _this._getLittleEndianedDword(headerStream);
+            return _this._consumeUint32(headerStream);
         }).then(function (height) {
             aviMainHeader.height = height;
             return Promise.resolve(aviMainHeader);
@@ -205,10 +205,10 @@ var MJPEGReader = (function () {
                     sequence = sequence.then(function () {
                         return indexDataStream.seek(i * 16 + 8);
                     }).then(function () {
-                        return _this._getLittleEndianedDword(indexDataStream);
+                        return _this._consumeUint32(indexDataStream);
                     }).then(function (offset) {
                         index.byteOffset = offset + 4; // ignore 'movi' string
-                        return _this._getLittleEndianedDword(indexDataStream);
+                        return _this._consumeUint32(indexDataStream);
                     }).then(function (length) {
                         index.byteLength = length;
                         if (length > 0)
@@ -237,15 +237,15 @@ var MJPEGReader = (function () {
         if (typeof sliceContainingData === "undefined") { sliceContainingData = false; }
         var head = {};
 
-        return this._getFourCC(stream).then(function (nameParam) {
+        return this._consumeFourCC(stream).then(function (nameParam) {
             head.name = nameParam;
-            return _this._getLittleEndianedDword(stream);
+            return _this._consumeUint32(stream);
         }).then(function (sizeParam) {
             head.size = sizeParam;
             if (head.name !== name)
                 return Promise.reject(new Error("Incorrect AVI format."));
 
-            return _this._getFourCC(stream).then(function (subtypeParam) {
+            return _this._consumeFourCC(stream).then(function (subtypeParam) {
                 if (subtypeParam !== subtype)
                     return Promise.reject(new Error("Unexpected name is detected for AVI structure."));
 
@@ -260,9 +260,9 @@ var MJPEGReader = (function () {
         if (typeof sliceContainingData === "undefined") { sliceContainingData = false; }
         var head = {};
 
-        return this._getFourCC(stream).then(function (idParam) {
+        return this._consumeFourCC(stream).then(function (idParam) {
             head.id = idParam;
-            return _this._getLittleEndianedDword(stream);
+            return _this._consumeUint32(stream);
         }).then(function (sizeParam) {
             if (head.id === id) {
                 if (sliceContainingData)
@@ -277,7 +277,7 @@ var MJPEGReader = (function () {
         });
     };
 
-    MJPEGReader._getFourCC = function (stream) {
+    MJPEGReader._consumeFourCC = function (stream) {
         return new Promise(function (resolve, reject) {
             stream.readBytesAs = "text";
             var promise = stream.readBytes(4).then(function (result) {
@@ -287,12 +287,10 @@ var MJPEGReader = (function () {
         });
     };
 
-    MJPEGReader._getLittleEndianedDword = function (stream) {
-        return new Promise(function (resolve, reject) {
-            stream.readBytes(4).then(function (result) {
-                var dataView = new DataView(result.data);
-                resolve(dataView.getUint32(0, true));
-            });
+    MJPEGReader._consumeUint32 = function (stream) {
+        return stream.readBytes(4).then(function (result) {
+            var dataView = new DataView(result.data);
+            return dataView.getUint32(0, true);
         });
     };
     return MJPEGReader;
