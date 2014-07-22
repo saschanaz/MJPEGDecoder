@@ -106,21 +106,49 @@ class MJPEGReader {
         //};
     }
 
-    private static _readMovi(array: Uint8Array) {
-        var moviList = this._getTypedData(array, "LIST", "movi");
-        return { dataArray: moviList };
+    private static _readMovi(stream: BlobStream) {
+        var moviData = {
+            dataStream: <BlobStream>null
+        };
+        return this._getTypedData(stream, "LIST", "movi")
+            .then((movi) => {
+                moviData.dataStream = movi;
+                return Promise.resolve(moviData);
+            });
+        //return { dataArray: moviList };
     }
 
-    private static _readAVIIndex(array: Uint8Array) {
-        var indexData = this._getNonTypedData(array, "idx1");
-        var indexes: AVIOldIndex[] = [];
-        for (var i = 0; i < indexData.byteLength / 16; i += 1) {
-            var offset = this._getLittleEndianedDword(indexData, i * 16 + 8);
-            var length = this._getLittleEndianedDword(indexData, i * 16 + 12);
-            if (length > 0)
-                indexes[i] = { byteOffset: offset - 4, byteLength: length };//ignoring 'movi' string
-        }
-        return indexes;
+    private static _readAVIIndex(stream: BlobStream) {
+        return this._getNonTypedData(stream, "idx1")
+            .then((indexDataStream) => {
+                var indexes: AVIOldIndex[] = [];
+
+                var sequence = Promise.resolve<void>();
+                for (var i = 0; i < indexDataStream.blob.size / 16; i++) {
+                    ((i: number) => {
+                        var index: AVIOldIndex = {
+                            byteOffset: 0,
+                            byteLength: 0
+                        };
+                        sequence = sequence
+                            .then(() => {
+                                return indexDataStream.seek(i * 16 + 8);
+                            }).then(() => {
+                                return this._getLittleEndianedDword(indexDataStream);
+                            }).then((offset) => {
+                                index.byteOffset = offset;
+                                return this._getLittleEndianedDword(indexDataStream);
+                            }).then((length) => {
+                                index.byteLength = length;
+                                if (length > 0)
+                                    indexes[i] = index;
+                            });
+                    })(i);
+                }
+                return sequence.then(() => {
+                    return Promise.resolve(indexes);
+                });
+            });
     }
 
     private static _exportJPEG(moviList: Uint8Array, indexes: AVIOldIndex[]) {

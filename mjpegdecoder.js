@@ -162,21 +162,47 @@ var MJPEGReader = (function () {
         //};
     };
 
-    MJPEGReader._readMovi = function (array) {
-        var moviList = this._getTypedData(array, "LIST", "movi");
-        return { dataArray: moviList };
+    MJPEGReader._readMovi = function (stream) {
+        var moviData = {
+            dataStream: null
+        };
+        return this._getTypedData(stream, "LIST", "movi").then(function (movi) {
+            moviData.dataStream = movi;
+            return Promise.resolve(moviData);
+        });
+        //return { dataArray: moviList };
     };
 
-    MJPEGReader._readAVIIndex = function (array) {
-        var indexData = this._getNonTypedData(array, "idx1");
-        var indexes = [];
-        for (var i = 0; i < indexData.byteLength / 16; i += 1) {
-            var offset = this._getLittleEndianedDword(indexData, i * 16 + 8);
-            var length = this._getLittleEndianedDword(indexData, i * 16 + 12);
-            if (length > 0)
-                indexes[i] = { byteOffset: offset - 4, byteLength: length }; //ignoring 'movi' string
-        }
-        return indexes;
+    MJPEGReader._readAVIIndex = function (stream) {
+        var _this = this;
+        return this._getNonTypedData(stream, "idx1").then(function (indexDataStream) {
+            var indexes = [];
+
+            var sequence = Promise.resolve();
+            for (var i = 0; i < indexDataStream.blob.size / 16; i++) {
+                (function (i) {
+                    var index = {
+                        byteOffset: 0,
+                        byteLength: 0
+                    };
+                    sequence = sequence.then(function () {
+                        return indexDataStream.seek(i * 16 + 8);
+                    }).then(function () {
+                        return _this._getLittleEndianedDword(indexDataStream);
+                    }).then(function (offset) {
+                        index.byteOffset = offset;
+                        return _this._getLittleEndianedDword(indexDataStream);
+                    }).then(function (length) {
+                        index.byteLength = length;
+                        if (length > 0)
+                            indexes[i] = index;
+                    });
+                })(i);
+            }
+            return sequence.then(function () {
+                return Promise.resolve(indexes);
+            });
+        });
     };
 
     MJPEGReader._exportJPEG = function (moviList, indexes) {
