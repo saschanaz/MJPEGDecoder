@@ -154,18 +154,26 @@ var MJPEGReader = (function () {
     };
 
     MJPEGReader._getTypedData = function (stream, structureType, dataName) {
-        var type = this._getFourCC(array, 0);
-        if (type === structureType) {
-            var name = this._getFourCC(array, 8);
-            if (name === dataName)
-                return array.subarray(12, 8 + this._getLittleEndianedDword(array, 4));
-            else
-                throw new Error("Different data name is detected.");
-        } else if (type === "JUNK") {
-            var junkLength = 8 + this._getLittleEndianedDword(array, 4);
-            return this._getTypedData(array.subarray(junkLength), structureType, dataName);
-        } else
-            throw new Error("Incorrect Format");
+        var _this = this;
+        var dataInfo = { type: '', length: 0, name: '' };
+
+        return this._getFourCC(stream).then(function (type) {
+            dataInfo.type = type;
+            return _this._getLittleEndianedDword(stream);
+        }).then(function (length) {
+            dataInfo.length = length;
+            if (dataInfo.type === structureType)
+                return _this._getFourCC(stream).then(function (name) {
+                    if (dataInfo.name === name)
+                        return Promise.resolve(stream.slice(12, 8 + length));
+                    else
+                        return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+                });
+            else if (dataInfo.type === "JUNK") {
+                return _this._getTypedData(stream.slice(length), structureType, dataName);
+            } else
+                return Promise.reject(new Error("Incorrect AVI typed data format."));
+        });
     };
     MJPEGReader._getNonTypedData = function (array, dataName) {
         var name = this._getFourCC(array, 0);
@@ -194,10 +202,13 @@ var MJPEGReader = (function () {
     };
 
     MJPEGReader._getFourCC = function (stream) {
-        stream.readBytesAs = "text";
-        var promise = stream.readBytes(4);
-        stream.readBytesAs = "as-is";
-        return promise;
+        return new Promise(function (resolve, reject) {
+            stream.readBytesAs = "text";
+            var promise = stream.readBytes(4).then(function (result) {
+                resolve(result.data);
+            });
+            stream.readBytesAs = "as-is";
+        });
     };
 
     MJPEGReader._getLittleEndianedDword = function (stream) {

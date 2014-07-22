@@ -94,21 +94,28 @@ class MJPEGReader {
         return JPEGs;
     }
 
-    private static _getTypedData(stream: BlobStream, structureType: string, dataName: string): Uint8Array {
-        var type = this._getFourCC(array, 0);
-        if (type === structureType) {
-            var name = this._getFourCC(array, 8);
-            if (name === dataName)
-                return array.subarray(12, 8 + this._getLittleEndianedDword(array, 4));
-            else
-                throw new Error("Different data name is detected.");
-        }
-        else if (type === "JUNK") {
-            var junkLength = 8 + this._getLittleEndianedDword(array, 4);
-            return this._getTypedData(array.subarray(junkLength), structureType, dataName);
-        }
-        else
-            throw new Error("Incorrect Format");
+    private static _getTypedData(stream: BlobStream, structureType: string, dataName: string): Promise<BlobStream> {
+        var dataInfo = { type: '', length: 0, name: ''};
+
+        return this._getFourCC(stream)
+            .then((type) => { // get type
+                dataInfo.type = type;
+                return this._getLittleEndianedDword(stream);
+            }).then((length) => { // get length
+                dataInfo.length = length;
+                if (dataInfo.type === structureType)
+                    return this._getFourCC(stream).then((name) => { // get name
+                        if (dataInfo.name === name)
+                            return Promise.resolve(stream.slice(12, 8 + length));
+                        else
+                            return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+                    });
+                else if (dataInfo.type === "JUNK") {
+                    return this._getTypedData(stream.slice(length), structureType, dataName);
+                }
+                else
+                    return Promise.reject(new Error("Incorrect AVI typed data format."));
+            });
     }
     private static _getNonTypedData(array: Uint8Array, dataName: string): Uint8Array {
         var name = this._getFourCC(array, 0);
