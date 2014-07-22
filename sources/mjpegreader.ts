@@ -36,36 +36,74 @@ class MJPEGReader {
     }
 
     private static _readRiff(stream: BlobStream) {
-        var riff = this._getTypedData(array, "RIFF", "AVI ");
-        var targetDataArray = riff;
-        var hdrlList = this._readHdrl(targetDataArray);
-        targetDataArray = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
-        var moviList = this._readMovi(targetDataArray);
-        targetDataArray = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength);//JUNK safe subarray
-        var indexes = this._readAVIIndex(targetDataArray);
+        var riff = this._getTypedData(stream, "RIFF", "AVI ");
+        var targetDataStream = riff;
+        var hdrlList = this._readHdrl(targetDataStream);
+        targetDataStream = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
+        var moviList = this._readMovi(targetDataStream);
+        targetDataStream = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength);//JUNK safe subarray
+        var indexes = this._readAVIIndex(targetDataStream);
         var exportedJPEG = this._exportJPEG(moviList.dataArray, indexes);
 
         return { mainHeader: hdrlList.mainHeader, JPEGs: exportedJPEG };
     }
 
-    private static _readHdrl(array: Uint8Array) {
-        var hdrlList = this._getTypedData(array, "LIST", "hdrl");
+    private static _readHdrl(stream: BlobStream) {
+        var hdrlData = {
+            dataStream: <BlobStream>null,
+            mainHeader: <AVIMainHeader>null
+        };
+        return this._getTypedData(stream, "LIST", "hdrl")
+            .then((hdrlList) => {
+                hdrlData.dataStream = hdrlList;
+                return this._readAVIMainHeader(hdrlList);
+            }).then((mainHeader) => {
+                hdrlData.mainHeader = mainHeader;
+                return Promise.resolve(hdrlData);
+            });
 
-        var mainHeader = this._readAVIMainHeader(hdrlList);
-        return { dataArray: hdrlList, mainHeader: mainHeader }
+        //var hdrlList = this._getTypedData(stream, "LIST", "hdrl");
+
+        //var mainHeader = this._readAVIMainHeader(hdrlList);
+        //return { dataArray: hdrlList, mainHeader: mainHeader }
     }
 
-    private static _readAVIMainHeader(array: Uint8Array) {
+    private static _readAVIMainHeader(stream: BlobStream) {
         //if (this._getFourCC(array, 0) !== "avih")
         //    throw new Error("Incorrect Format");
-        var headerArray = this._getNonTypedData(array, "avih");//array.subarray(8, 8 + this._getLittleEndianedDword(array, 4))
+        var headerStream: BlobStream;
+        var aviMainHeader: AVIMainHeader = {
+            frameIntervalMicroseconds: 0,
+            totalFrames: 0,
+            width: 0,
+            height: 0
+        }
+        return this._getNonTypedData(stream, "avih")
+            .then((header) => {
+                headerStream = header;
+                return this._getLittleEndianedDword(headerStream);
+            }).then((frameIntervalMicroseconds) => {
+                aviMainHeader.frameIntervalMicroseconds = frameIntervalMicroseconds;
+                return headerStream.seek(16);
+            }).then(() => {
+                return this._getLittleEndianedDword(headerStream);
+            }).then((totalFrames) => {
+                aviMainHeader.totalFrames = totalFrames;
+                return this._getLittleEndianedDword(headerStream);
+            }).then((width) => {
+                aviMainHeader.width = width;
+                return this._getLittleEndianedDword(headerStream);
+            }).then((height) => {
+                aviMainHeader.height = height;
+                return Promise.resolve(aviMainHeader);
+            });
 
-        return <AVIMainHeader>{
-            frameIntervalMicroseconds: this._getLittleEndianedDword(headerArray, 0),
-            totalFrames: this._getLittleEndianedDword(headerArray, 16),
-            width: this._getLittleEndianedDword(headerArray, 32),
-            height: this._getLittleEndianedDword(headerArray, 36)
-        };
+        //return <AVIMainHeader>{
+        //    frameIntervalMicroseconds: this._getLittleEndianedDword(headerArray, 0),
+        //    totalFrames: this._getLittleEndianedDword(headerArray, 16),
+        //    width: this._getLittleEndianedDword(headerArray, 32),
+        //    height: this._getLittleEndianedDword(headerArray, 36)
+        //};
     }
 
     private static _readMovi(array: Uint8Array) {
@@ -117,7 +155,7 @@ class MJPEGReader {
                     return Promise.reject(new Error("Incorrect AVI typed data format."));
             });
     }
-    private static _getNonTypedData(stream: BlobStream, dataName: string) {
+    private static _getNonTypedData(stream: BlobStream, dataName: string): Promise<BlobStream> {
         var dataInfo = { name: '' };
 
         return this._getFourCC(stream)

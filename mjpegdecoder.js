@@ -95,36 +95,71 @@ var MJPEGReader = (function () {
     };
 
     MJPEGReader._readRiff = function (stream) {
-        var riff = this._getTypedData(array, "RIFF", "AVI ");
-        var targetDataArray = riff;
-        var hdrlList = this._readHdrl(targetDataArray);
-        targetDataArray = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
-        var moviList = this._readMovi(targetDataArray);
-        targetDataArray = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength); //JUNK safe subarray
-        var indexes = this._readAVIIndex(targetDataArray);
+        var riff = this._getTypedData(stream, "RIFF", "AVI ");
+        var targetDataStream = riff;
+        var hdrlList = this._readHdrl(targetDataStream);
+        targetDataStream = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
+        var moviList = this._readMovi(targetDataStream);
+        targetDataStream = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength); //JUNK safe subarray
+        var indexes = this._readAVIIndex(targetDataStream);
         var exportedJPEG = this._exportJPEG(moviList.dataArray, indexes);
 
         return { mainHeader: hdrlList.mainHeader, JPEGs: exportedJPEG };
     };
 
-    MJPEGReader._readHdrl = function (array) {
-        var hdrlList = this._getTypedData(array, "LIST", "hdrl");
-
-        var mainHeader = this._readAVIMainHeader(hdrlList);
-        return { dataArray: hdrlList, mainHeader: mainHeader };
+    MJPEGReader._readHdrl = function (stream) {
+        var _this = this;
+        var hdrlData = {
+            dataStream: null,
+            mainHeader: null
+        };
+        return this._getTypedData(stream, "LIST", "hdrl").then(function (hdrlList) {
+            hdrlData.dataStream = hdrlList;
+            return _this._readAVIMainHeader(hdrlList);
+        }).then(function (mainHeader) {
+            hdrlData.mainHeader = mainHeader;
+            return Promise.resolve(hdrlData);
+        });
+        //var hdrlList = this._getTypedData(stream, "LIST", "hdrl");
+        //var mainHeader = this._readAVIMainHeader(hdrlList);
+        //return { dataArray: hdrlList, mainHeader: mainHeader }
     };
 
-    MJPEGReader._readAVIMainHeader = function (array) {
+    MJPEGReader._readAVIMainHeader = function (stream) {
+        var _this = this;
         //if (this._getFourCC(array, 0) !== "avih")
         //    throw new Error("Incorrect Format");
-        var headerArray = this._getNonTypedData(array, "avih");
-
-        return {
-            frameIntervalMicroseconds: this._getLittleEndianedDword(headerArray, 0),
-            totalFrames: this._getLittleEndianedDword(headerArray, 16),
-            width: this._getLittleEndianedDword(headerArray, 32),
-            height: this._getLittleEndianedDword(headerArray, 36)
+        var headerStream;
+        var aviMainHeader = {
+            frameIntervalMicroseconds: 0,
+            totalFrames: 0,
+            width: 0,
+            height: 0
         };
+        return this._getNonTypedData(stream, "avih").then(function (header) {
+            headerStream = header;
+            return _this._getLittleEndianedDword(headerStream);
+        }).then(function (frameIntervalMicroseconds) {
+            aviMainHeader.frameIntervalMicroseconds = frameIntervalMicroseconds;
+            return headerStream.seek(16);
+        }).then(function () {
+            return _this._getLittleEndianedDword(headerStream);
+        }).then(function (totalFrames) {
+            aviMainHeader.totalFrames = totalFrames;
+            return _this._getLittleEndianedDword(headerStream);
+        }).then(function (width) {
+            aviMainHeader.width = width;
+            return _this._getLittleEndianedDword(headerStream);
+        }).then(function (height) {
+            aviMainHeader.height = height;
+            return Promise.resolve(aviMainHeader);
+        });
+        //return <AVIMainHeader>{
+        //    frameIntervalMicroseconds: this._getLittleEndianedDword(headerArray, 0),
+        //    totalFrames: this._getLittleEndianedDword(headerArray, 16),
+        //    width: this._getLittleEndianedDword(headerArray, 32),
+        //    height: this._getLittleEndianedDword(headerArray, 36)
+        //};
     };
 
     MJPEGReader._readMovi = function (array) {
