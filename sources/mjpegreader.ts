@@ -186,7 +186,7 @@ class MJPEGReader {
         return JPEGs;
     }
 
-    private static _consumeStructureHead(stream: BlobStream, name: string, subtype: string, sliceContainingData = false): Promise<BlobStream> {
+    private static _consumeStructureHead(stream: BlobStream, name: string, subtype: string, sliceContainingData = false): Promise<AVIGeneralStructure> {
         var head: AVIGeneralStructure = <any>{};
 
         return this._consumeFourCC(stream)
@@ -208,7 +208,7 @@ class MJPEGReader {
                 });    
             });
     }
-    private static _consumeChunkHead(stream: BlobStream, id: string, sliceContainingData = false): Promise<BlobStream> {
+    private static _consumeChunkHead(stream: BlobStream, id: string, sliceContainingData = false): Promise<AVIGeneralChunk> {
         var head: AVIGeneralChunk = <any>{};
 
         return this._consumeFourCC(stream)
