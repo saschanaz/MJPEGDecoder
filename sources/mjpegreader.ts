@@ -36,27 +36,42 @@ class MJPEGReader {
     }
 
     private static _readRiff(stream: BlobStream) {
-        var targetDataStream: BlobStream;
+        /*
+        TODO: all functions except readMovi should just consume the stream, not copy it by slicing.
+        getTypedData -> consumeStructureHead (it still can provide sliced stream to read outside of consuming order)
+        interface AVIGeneralStructure {
+            name: string; // former type
+            size: number;
+            subtype: string; // former name
+            data?: BlobStream;
+        }
+        getNonTypedData -> consumeChunkHead
+        interface AVIGeneralChunk {
+            id: string; // former name
+            size: number;
+            data?: BlobStream;
+        }
+        */
 
-        //return this._getTypedData(stream, "RIFF", "AVI ")
-        //    .then((riff) => {
-        //        targetDataStream = riff;
-        //        return this._readHdrl(targetDataStream);
-        //    }).then((hdrlList) => {
-        //        targetDataStream = stream.slice(hdrlList.dataStream.blob.;
-        //        return this._
-        //    });
+        var riffData = {
+            mainHeader: <AVIMainHeader>null,
+            JPEGs: <Blob[]>null
+        };
+        var moviStream: BlobStream;
 
-        //var riff = this._getTypedData(stream, "RIFF", "AVI ");
-        //var targetDataStream = riff;
-        //var hdrlList = this._readHdrl(targetDataStream);
-        //targetDataStream = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
-        //var moviList = this._readMovi(targetDataStream);
-        //targetDataStream = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength);//JUNK safe subarray
-        //var indexes = this._readAVIIndex(targetDataStream);
-        //var exportedJPEG = this._exportJPEG(moviList.dataArray, indexes);
-
-        //return { mainHeader: hdrlList.mainHeader, JPEGs: exportedJPEG };
+        return this._getTypedData(stream, "RIFF", "AVI ")
+            .then(() => {
+                return this._readHdrl(stream);
+            }).then((hdrlList) => {
+                riffData.mainHeader = hdrlList.mainHeader;
+                return this._readMovi(stream);
+            }).then((moviList) => {
+                moviStream = moviList.dataStream;
+                return this._readAVIIndex(stream);
+            }).then((indexes) => {
+                riffData.JPEGs = this._exportJPEG(moviStream, indexes);
+                return riffData;
+            });
     }
 
     private static _readHdrl(stream: BlobStream) {
@@ -80,8 +95,6 @@ class MJPEGReader {
     }
 
     private static _readAVIMainHeader(stream: BlobStream) {
-        //if (this._getFourCC(array, 0) !== "avih")
-        //    throw new Error("Incorrect Format");
         var headerStream: BlobStream;
         var aviMainHeader: AVIMainHeader = {
             frameIntervalMicroseconds: 0,
@@ -108,13 +121,6 @@ class MJPEGReader {
                 aviMainHeader.height = height;
                 return Promise.resolve(aviMainHeader);
             });
-
-        //return <AVIMainHeader>{
-        //    frameIntervalMicroseconds: this._getLittleEndianedDword(headerArray, 0),
-        //    totalFrames: this._getLittleEndianedDword(headerArray, 16),
-        //    width: this._getLittleEndianedDword(headerArray, 32),
-        //    height: this._getLittleEndianedDword(headerArray, 36)
-        //};
     }
 
     private static _readMovi(stream: BlobStream) {

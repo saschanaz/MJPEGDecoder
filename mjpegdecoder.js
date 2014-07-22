@@ -95,24 +95,41 @@ var MJPEGReader = (function () {
     };
 
     MJPEGReader._readRiff = function (stream) {
-        var targetDataStream;
-        //return this._getTypedData(stream, "RIFF", "AVI ")
-        //    .then((riff) => {
-        //        targetDataStream = riff;
-        //        return this._readHdrl(targetDataStream);
-        //    }).then((hdrlList) => {
-        //        targetDataStream = stream.slice(hdrlList.dataStream.blob.;
-        //        return this._
-        //    });
-        //var riff = this._getTypedData(stream, "RIFF", "AVI ");
-        //var targetDataStream = riff;
-        //var hdrlList = this._readHdrl(targetDataStream);
-        //targetDataStream = array.subarray(hdrlList.dataArray.byteOffset + hdrlList.dataArray.byteLength);
-        //var moviList = this._readMovi(targetDataStream);
-        //targetDataStream = array.subarray(moviList.dataArray.byteOffset + moviList.dataArray.byteLength);//JUNK safe subarray
-        //var indexes = this._readAVIIndex(targetDataStream);
-        //var exportedJPEG = this._exportJPEG(moviList.dataArray, indexes);
-        //return { mainHeader: hdrlList.mainHeader, JPEGs: exportedJPEG };
+        /*
+        TODO: all functions except readMovi should just consume the stream, not copy it by slicing.
+        getTypedData -> consumeStructureHead (it still can provide sliced stream to read outside of consuming order)
+        interface AVIGeneralStructure {
+        name: string; // former type
+        size: number;
+        subtype: string; // former name
+        data?: BlobStream;
+        }
+        getNonTypedData -> consumeChunkHead
+        interface AVIGeneralChunk {
+        id: string; // former name
+        size: number;
+        data?: BlobStream;
+        }
+        */
+        var _this = this;
+        var riffData = {
+            mainHeader: null,
+            JPEGs: null
+        };
+        var moviStream;
+
+        return this._getTypedData(stream, "RIFF", "AVI ").then(function () {
+            return _this._readHdrl(stream);
+        }).then(function (hdrlList) {
+            riffData.mainHeader = hdrlList.mainHeader;
+            return _this._readMovi(stream);
+        }).then(function (moviList) {
+            moviStream = moviList.dataStream;
+            return _this._readAVIIndex(stream);
+        }).then(function (indexes) {
+            riffData.JPEGs = _this._exportJPEG(moviStream, indexes);
+            return riffData;
+        });
     };
 
     MJPEGReader._readHdrl = function (stream) {
@@ -135,8 +152,6 @@ var MJPEGReader = (function () {
 
     MJPEGReader._readAVIMainHeader = function (stream) {
         var _this = this;
-        //if (this._getFourCC(array, 0) !== "avih")
-        //    throw new Error("Incorrect Format");
         var headerStream;
         var aviMainHeader = {
             frameIntervalMicroseconds: 0,
@@ -162,12 +177,6 @@ var MJPEGReader = (function () {
             aviMainHeader.height = height;
             return Promise.resolve(aviMainHeader);
         });
-        //return <AVIMainHeader>{
-        //    frameIntervalMicroseconds: this._getLittleEndianedDword(headerArray, 0),
-        //    totalFrames: this._getLittleEndianedDword(headerArray, 16),
-        //    width: this._getLittleEndianedDword(headerArray, 32),
-        //    height: this._getLittleEndianedDword(headerArray, 36)
-        //};
     };
 
     MJPEGReader._readMovi = function (stream) {
