@@ -118,7 +118,7 @@ var MJPEGReader = (function () {
         };
         var moviStream;
 
-        return this._getTypedData(stream, "RIFF", "AVI ").then(function () {
+        return this._consumeStructureHead(stream, "RIFF", "AVI ").then(function () {
             return _this._readHdrl(stream);
         }).then(function (hdrlList) {
             riffData.mainHeader = hdrlList.mainHeader;
@@ -138,7 +138,7 @@ var MJPEGReader = (function () {
             dataStream: null,
             mainHeader: null
         };
-        return this._getTypedData(stream, "LIST", "hdrl").then(function (hdrlList) {
+        return this._consumeStructureHead(stream, "LIST", "hdrl").then(function (hdrlList) {
             hdrlData.dataStream = hdrlList;
             return _this._readAVIMainHeader(hdrlList);
         }).then(function (mainHeader) {
@@ -183,7 +183,7 @@ var MJPEGReader = (function () {
         var moviData = {
             dataStream: null
         };
-        return this._getTypedData(stream, "LIST", "movi").then(function (movi) {
+        return this._consumeStructureHead(stream, "LIST", "movi").then(function (movi) {
             moviData.dataStream = movi;
             return Promise.resolve(moviData);
         });
@@ -232,24 +232,29 @@ var MJPEGReader = (function () {
         return JPEGs;
     };
 
-    MJPEGReader._getTypedData = function (stream, structureType, dataName) {
+    MJPEGReader._consumeStructureHead = function (stream, name, subtype, sliceContainingData) {
         var _this = this;
-        var dataInfo = { type: '', length: 0 };
+        if (typeof sliceContainingData === "undefined") { sliceContainingData = false; }
+        var head = {};
 
-        return this._getFourCC(stream).then(function (type) {
-            dataInfo.type = type;
+        return this._getFourCC(stream).then(function (name) {
+            head.name = name;
             return _this._getLittleEndianedDword(stream);
-        }).then(function (length) {
-            dataInfo.length = length;
-            if (dataInfo.type === structureType)
-                return _this._getFourCC(stream).then(function (name) {
-                    if (name === dataName)
-                        return Promise.resolve(stream.slice(12, 8 + length));
-                    else
+        }).then(function (size) {
+            head.size = size;
+            if (head.name === name)
+                return _this._getFourCC(stream).then(function (subtypeName) {
+                    if (subtypeName !== subtype)
                         return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+
+                    if (sliceContainingData)
+                        head.slicedData = stream.slice(0, size - 4);
+                    return Promise.resolve(head);
                 });
-            else if (dataInfo.type === "JUNK") {
-                return _this._getTypedData(stream.slice(length), structureType, dataName);
+            else if (head.name === "JUNK") {
+                return stream.seek(stream.byteOffset + size - 8).then(function () {
+                    return _this._consumeStructureHead(stream, name, subtype);
+                });
             } else
                 return Promise.reject(new Error("Incorrect AVI typed data format."));
         });

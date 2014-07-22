@@ -5,9 +5,16 @@
 //BITMAPINFOHEADER structure http://msdn.microsoft.com/en-us/library/windows/desktop/dd318229(v=vs.85).aspx
 "use strict";
 
-interface TypedData {
-    name: string;
-    data: Uint8Array;
+interface AVIGeneralStructure {
+    name: string; // former type
+    size: number;
+    subtype: string; // former name
+    slicedData?: BlobStream;
+}
+interface AVIGeneralChunk {
+    id: string; // former name
+    size: number;
+    slicedData?: BlobStream;
 }
 interface AVIMainHeader {
     frameIntervalMicroseconds: number;
@@ -59,7 +66,7 @@ class MJPEGReader {
         };
         var moviStream: BlobStream;
 
-        return this._getTypedData(stream, "RIFF", "AVI ")
+        return this._consumeStructureHead(stream, "RIFF", "AVI ")
             .then(() => {
                 return this._readHdrl(stream);
             }).then((hdrlList) => {
@@ -79,7 +86,7 @@ class MJPEGReader {
             dataStream: <BlobStream>null,
             mainHeader: <AVIMainHeader>null
         };
-        return this._getTypedData(stream, "LIST", "hdrl")
+        return this._consumeStructureHead(stream, "LIST", "hdrl")
             .then((hdrlList) => {
                 hdrlData.dataStream = hdrlList;
                 return this._readAVIMainHeader(hdrlList);
@@ -127,7 +134,7 @@ class MJPEGReader {
         var moviData = {
             dataStream: <BlobStream>null
         };
-        return this._getTypedData(stream, "LIST", "movi")
+        return this._consumeStructureHead(stream, "LIST", "movi")
             .then((movi) => {
                 moviData.dataStream = movi;
                 return Promise.resolve(moviData);
@@ -179,24 +186,27 @@ class MJPEGReader {
         return JPEGs;
     }
 
-    private static _getTypedData(stream: BlobStream, structureType: string, dataName: string): Promise<BlobStream> {
-        var dataInfo = { type: '', length: 0 };
+    private static _consumeStructureHead(stream: BlobStream, name: string, subtype: string, sliceContainingData = false): Promise<BlobStream> {
+        var head: AVIGeneralStructure = <any>{};
 
         return this._getFourCC(stream)
-            .then((type) => { // get type
-                dataInfo.type = type;
+            .then((name) => { // get name
+                head.name = name;
                 return this._getLittleEndianedDword(stream);
-            }).then((length) => { // get length
-                dataInfo.length = length;
-                if (dataInfo.type === structureType)
-                    return this._getFourCC(stream).then((name) => { // get name
-                        if (name === dataName)
-                            return Promise.resolve(stream.slice(12, 8 + length));
-                        else
+            }).then((size) => { // get length
+                head.size = size;
+                if (head.name === name)
+                    return this._getFourCC(stream).then((subtypeName) => { // get subtype
+                        if (subtypeName !== subtype)
                             return Promise.reject(new Error("Unexpected name is detected for AVI typed data."));
+
+                        if (sliceContainingData)
+                            head.slicedData = stream.slice(0, size - 4);
+                        return Promise.resolve(head);    
                     });
-                else if (dataInfo.type === "JUNK") {
-                    return this._getTypedData(stream.slice(length), structureType, dataName);
+                else if (head.name === "JUNK") {
+                    return stream.seek(stream.byteOffset + size - 8)
+                        .then(() => this._consumeStructureHead(stream, name, subtype));
                 }
                 else
                     return Promise.reject(new Error("Incorrect AVI typed data format."));
