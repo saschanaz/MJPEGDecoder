@@ -1,4 +1,4 @@
-declare class _H264LosslessEncoder {
+﻿declare class _H264LosslessEncoder {
     static SPS: number[];
     static PPS: number[];
     static sliceHeader: number[];
@@ -6,9 +6,16 @@ declare class _H264LosslessEncoder {
     static encodeFrame(imageData: ImageData): Uint8Array;
     static convertToYUV(rgba: Uint8Array): number[];
 }
-interface TypedData {
+interface AVIGeneralStructure {
     name: string;
-    data: Uint8Array;
+    size: number;
+    subtype: string;
+    slicedData?: BlobStream;
+}
+interface AVIGeneralChunk {
+    id: string;
+    size: number;
+    slicedData?: BlobStream;
 }
 interface AVIMainHeader {
     frameIntervalMicroseconds: number;
@@ -22,17 +29,16 @@ interface AVIOldIndex {
 }
 declare class MJPEGReader {
     static read(file: Blob): Promise<MJPEG>;
-    private static _readRiff(array);
-    private static _readHdrl(array);
-    private static _readAVIMainHeader(array);
-    private static _readMovi(array);
-    private static _readAVIIndex(array);
+    private static _consumeRiff(stream);
+    private static _consumeHdrl(stream);
+    private static _consumeAVIMainHeader(stream);
+    private static _consumeMovi(stream);
+    private static _consumeAVIIndex(stream);
     private static _exportJPEG(moviList, indexes);
-    private static _getTypedData(array, structureType, dataName);
-    private static _getNonTypedData(array, dataName);
-    private static _findMarker(array, type, index);
-    private static _getFourCC(array, index);
-    private static _getLittleEndianedDword(array, index);
+    private static _consumeStructureHead(stream, name, subtype, sliceContainingData?);
+    private static _consumeChunkHead(stream, id);
+    private static _consumeFourCC(stream);
+    private static _consumeUint32(stream);
 }
 declare class MJPEG {
     public frameInterval: number;
