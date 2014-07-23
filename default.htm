@@ -13,12 +13,40 @@
     <script src="mjpegdecoder.js"></script>
 
     <script>
+        var exported;
+        var currentVideoTime = 0;
+        var stopToken = false;
         function decode() {
             MJPEGReader.read(loader.files[0])
                 .then(function (mjpeg) {
-                    window.mjpeg = mjpeg;
+                    exported = mjpeg;
+                    image.style.display = "block";
                     console.log("Decode completed.");
                 });
+        }
+        function show(time) {
+            currentVideoTime = time;
+            timer.value = time;
+            presenter.src = URL.createObjectURL(exported.getFrameByTime(time), { oneTimeOnly: true });
+        }
+        function auto() {
+            var startedTime = Date.now() / 1000;
+            var startedVideoTime = currentVideoTime;
+            var asyncOperation = function () {
+                if (stopToken) {
+                    stopToken = false;
+                    return;
+                }
+
+                var targetTime = startedVideoTime + Date.now() / 1000 - startedTime;
+                if (targetTime < exported.duration) {
+                    show(targetTime);
+                    window.setTimeout(asyncOperation, 10);
+                }
+                else
+                    show(exported.duration);
+            };
+            asyncOperation();
         }
     </script>
 </head>
@@ -26,8 +54,14 @@
     <h1>TypeScript HTML App</h1>
 
     <div id="content">
-        <label for="loader">Load File: </label><input id="loader" type="file" />
+        <label for="loader">Load File: </label><input name="loader" id="loader" type="file" />
         <input type="button" value="Push to decode" onclick="decode()" />
+    </div>
+    <div id="image" style="display: none;">
+        <label for="timer">Time: </label><input name="timer" id="timer" type="number" value="0" />
+        <input type="button" value="Push to show image" onclick="show(parseFloat(timer.value))" /><br />
+        <input type="button" value="Auto" onclick="auto()" /><input type="button" value="Auto" onclick="stopToken = true;" /><br />
+        <img id="presenter" />
     </div>
 </body>
 </html>

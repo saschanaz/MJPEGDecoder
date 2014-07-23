@@ -26,6 +26,11 @@ interface AVIOldIndex {
     byteLength: number;
 }
 class MJPEGReader {
+    /*
+    More memory usage saving
+    Do not save image blobs all together, but just parse their offset and size.
+    The offset of movi list should be saved to be used later.
+    */
     static read(file: Blob) {
         var stream = new BlobStream(file);
         return this._consumeRiff(stream)
@@ -41,23 +46,6 @@ class MJPEGReader {
     }
 
     private static _consumeRiff(stream: BlobStream) {
-        /*
-        TODO: all functions except readMovi should just consume the stream, not copy it by slicing.
-        getTypedData -> consumeStructureHead (it still can provide sliced stream to read outside of consuming order)
-        interface AVIGeneralStructure {
-            name: string; // former type
-            size: number;
-            subtype: string; // former name
-            data?: BlobStream;
-        }
-        getNonTypedData -> consumeChunkHead
-        interface AVIGeneralChunk {
-            id: string; // former name
-            size: number;
-            data?: BlobStream;
-        }
-        */
-
         var riffData = {
             mainHeader: <AVIMainHeader>null,
             JPEGs: <Blob[]>null
@@ -277,7 +265,7 @@ class MJPEG {
             return;
     }
     getFrameByTime(time: number) {
-        return this.getFrame(this.totalFrames * time / this.duration);
+        return this.getFrame(Math.floor(this.totalFrames * time / this.duration));
     }
 
     getBackwardFrame(index: number) {

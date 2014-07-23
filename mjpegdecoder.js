@@ -78,6 +78,11 @@ var _H264LosslessEncoder = (function () {
 var MJPEGReader = (function () {
     function MJPEGReader() {
     }
+    /*
+    More memory usage saving
+    Do not save image blobs all together, but just parse their offset and size.
+    The offset of movi list should be saved to be used later.
+    */
     MJPEGReader.read = function (file) {
         var stream = new BlobStream(file);
         return this._consumeRiff(stream).then(function (aviMJPEG) {
@@ -92,22 +97,6 @@ var MJPEGReader = (function () {
     };
 
     MJPEGReader._consumeRiff = function (stream) {
-        /*
-        TODO: all functions except readMovi should just consume the stream, not copy it by slicing.
-        getTypedData -> consumeStructureHead (it still can provide sliced stream to read outside of consuming order)
-        interface AVIGeneralStructure {
-        name: string; // former type
-        size: number;
-        subtype: string; // former name
-        data?: BlobStream;
-        }
-        getNonTypedData -> consumeChunkHead
-        interface AVIGeneralChunk {
-        id: string; // former name
-        size: number;
-        data?: BlobStream;
-        }
-        */
         var _this = this;
         var riffData = {
             mainHeader: null,
@@ -232,7 +221,7 @@ var MJPEGReader = (function () {
         var JPEGs = [];
         for (var i = 0; i < indexes.length; i++) {
             if (indexes[i])
-                JPEGs[i] = moviList.blob.slice(indexes[i].byteOffset, indexes[i].byteOffset + indexes[i].byteLength);
+                JPEGs[i] = moviList.blob.slice(indexes[i].byteOffset, indexes[i].byteOffset + indexes[i].byteLength, "image/jpeg");
         }
         return JPEGs;
     };
@@ -331,7 +320,7 @@ var MJPEG = (function () {
             return;
     };
     MJPEG.prototype.getFrameByTime = function (time) {
-        return this.getFrame(this.totalFrames * time / this.duration);
+        return this.getFrame(Math.floor(this.totalFrames * time / this.duration));
     };
 
     MJPEG.prototype.getBackwardFrame = function (index) {

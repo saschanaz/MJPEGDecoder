@@ -1,4 +1,4 @@
-﻿declare class _H264LosslessEncoder {
+declare class _H264LosslessEncoder {
     static SPS: number[];
     static PPS: number[];
     static sliceHeader: number[];
