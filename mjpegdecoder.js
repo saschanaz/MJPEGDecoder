@@ -188,6 +188,8 @@ var MJPEGReader = (function () {
         };
         return this._consumeStructureHead(stream, "LIST", "movi", true).then(function (structure) {
             moviData.dataStream = structure.slicedData;
+            return stream.seek(stream.byteOffset + structure.size);
+        }).then(function () {
             return moviData;
         });
         //return { dataArray: moviList };
@@ -256,7 +258,7 @@ var MJPEGReader = (function () {
                 });
             else if (head.name === "JUNK")
                 return stream.seek(stream.byteOffset + sizeParam).then(function () {
-                    return _this._consumeStructureHead(stream, name, subtype);
+                    return _this._consumeStructureHead(stream, name, subtype, sliceContainingData);
                 });
             else
                 return Promise.reject(new Error("Incorrect AVI format."));

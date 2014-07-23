@@ -141,6 +141,8 @@ class MJPEGReader {
         return this._consumeStructureHead(stream, "LIST", "movi", true)
             .then((structure) => {
                 moviData.dataStream = structure.slicedData;
+                return stream.seek(stream.byteOffset + structure.size);
+            }).then(() => {
                 return moviData;
             });
         //return { dataArray: moviList };
@@ -210,7 +212,7 @@ class MJPEGReader {
                     });
                 else if (head.name === "JUNK")
                     return stream.seek(stream.byteOffset + sizeParam)
-                        .then(() => this._consumeStructureHead(stream, name, subtype));
+                        .then(() => this._consumeStructureHead(stream, name, subtype, sliceContainingData));
                 else
                     return Promise.reject(new Error("Incorrect AVI format."));
             });
