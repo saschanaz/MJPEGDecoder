@@ -187,7 +187,7 @@ class MJPEGReader {
         var JPEGs: Blob[] = [];
         for (var i = 0; i < indexes.length; i++) {
             if (indexes[i])
-                JPEGs[i] = moviList.blob.slice(indexes[i].byteOffset, indexes[i].byteOffset + indexes[i].byteLength);
+                JPEGs[i] = moviList.blob.slice(indexes[i].byteOffset, indexes[i].byteOffset + indexes[i].byteLength, "image/jpeg");
         }
         return JPEGs;
     }
