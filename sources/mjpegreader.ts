@@ -199,17 +199,20 @@ class MJPEGReader {
                 return this._consumeUint32(stream);
             }).then((sizeParam) => { // get length
                 head.size = sizeParam - 4; // size without subtype
-                if (head.name !== name)
+                if (head.name === name)
+                    return this._consumeFourCC(stream).then((subtypeParam) => { // get subtype
+                        if (subtypeParam !== subtype)
+                            return Promise.reject(new Error("Unexpected name is detected for AVI structure."));
+
+                        if (sliceContainingData)
+                            head.slicedData = stream.slice(stream.byteOffset, stream.byteOffset + head.size);
+                        return Promise.resolve(head);    
+                    });
+                else if (head.name === "JUNK")
+                    return stream.seek(stream.byteOffset + sizeParam)
+                        .then(() => this._consumeStructureHead(stream, name, subtype));
+                else
                     return Promise.reject(new Error("Incorrect AVI format."));
-
-                return this._consumeFourCC(stream).then((subtypeParam) => { // get subtype
-                    if (subtypeParam !== subtype)
-                        return Promise.reject(new Error("Unexpected name is detected for AVI structure."));
-
-                    if (sliceContainingData)
-                        head.slicedData = stream.slice(stream.byteOffset, stream.byteOffset + head.size);
-                    return Promise.resolve(head);    
-                });    
             });
     }
     private static _consumeChunkHead(stream: BlobStream, id: string): Promise<AVIGeneralChunk> {
