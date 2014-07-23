@@ -75,23 +75,30 @@ var _H264LosslessEncoder = (function () {
 //AVIOLDINDEX structure http://msdn.microsoft.com/en-us/library/windows/desktop/dd318181(v=vs.85).aspx
 //BITMAPINFOHEADER structure http://msdn.microsoft.com/en-us/library/windows/desktop/dd318229(v=vs.85).aspx
 "use strict";
+/*
+TODO
+Return MJPEGVideo object when indices starts to be read.
+Push each index as it is parsed -> _pushFrameIndices(frameIndex, frameNumber)
+_pushFrameIndices should run _fulfilled(i)
+_fulfilled is dynamically defined by getBackwardFrame/getForwardFrame, which resolved their Promises
+turn completed token on when all indices are parsed
+getBackwardFrame and getForwardFrame should return Promises, as it should wait until the requested frame gets fulfilled
+getBackwardFrame/getForwardFrame(i) waits until frameIndices gets larger than i + 1
+getBackwardFrame then finds the penultimate valid frame, while getForwardFrame gets last one.
+*/
 var MJPEGReader = (function () {
     function MJPEGReader() {
     }
-    /*
-    More memory usage saving
-    Do not save image blobs all together, but just parse their offset and size.
-    The offset of movi list should be saved to be used later.
-    */
     MJPEGReader.read = function (file) {
         var stream = new BlobStream(file);
         return this._consumeRiff(stream).then(function (aviMJPEG) {
-            var mjpeg = new MJPEG();
+            var mjpeg = new MJPEGVideo();
+            mjpeg.blob = file;
             mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
             mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
             mjpeg.width = aviMJPEG.mainHeader.width;
             mjpeg.height = aviMJPEG.mainHeader.height;
-            mjpeg.frames = aviMJPEG.JPEGs;
+            mjpeg.frameIndices = aviMJPEG.indices;
             return mjpeg;
         });
     };
@@ -100,9 +107,9 @@ var MJPEGReader = (function () {
         var _this = this;
         var riffData = {
             mainHeader: null,
-            JPEGs: null
+            indices: null
         };
-        var moviStream;
+        var moviPosition;
 
         return this._consumeStructureHead(stream, "RIFF", "AVI ").then(function () {
             return _this._consumeHdrl(stream);
@@ -110,10 +117,9 @@ var MJPEGReader = (function () {
             riffData.mainHeader = hdrlList.mainHeader;
             return _this._consumeMovi(stream);
         }).then(function (moviList) {
-            moviStream = moviList.dataStream;
-            return _this._consumeAVIIndex(stream);
-        }).then(function (indexes) {
-            riffData.JPEGs = _this._exportJPEG(moviStream, indexes);
+            return _this._consumeAVIIndex(stream, moviList.offset);
+        }).then(function (indices) {
+            riffData.indices = indices;
             return riffData;
         });
     };
@@ -173,10 +179,12 @@ var MJPEGReader = (function () {
 
     MJPEGReader._consumeMovi = function (stream) {
         var moviData = {
-            dataStream: null
+            offset: 0,
+            size: 0
         };
-        return this._consumeStructureHead(stream, "LIST", "movi", true).then(function (structure) {
-            moviData.dataStream = structure.slicedData;
+        return this._consumeStructureHead(stream, "LIST", "movi").then(function (structure) {
+            moviData.offset = stream.byteOffset;
+            moviData.size = structure.size;
             return stream.seek(stream.byteOffset + structure.size);
         }).then(function () {
             return moviData;
@@ -184,7 +192,7 @@ var MJPEGReader = (function () {
         //return { dataArray: moviList };
     };
 
-    MJPEGReader._consumeAVIIndex = function (stream) {
+    MJPEGReader._consumeAVIIndex = function (stream, moviOffset) {
         var _this = this;
         return this._consumeChunkHead(stream, "idx1").then(function (indexChunk) {
             var indexes = [];
@@ -201,10 +209,10 @@ var MJPEGReader = (function () {
                     }).then(function () {
                         return _this._consumeUint32(stream);
                     }).then(function (offset) {
-                        index.byteOffset = offset + 4; // ignore 'movi' string
+                        index.byteOffset = moviOffset + offset + 4; // ignore 'movi' string and frame chunk header (-4 + 8)
                         return _this._consumeUint32(stream);
                     }).then(function (length) {
-                        index.byteLength = length;
+                        index.byteLength = length - 8; // ignore frame chunk header size
                         if (length > 0)
                             indexes[i] = index;
                     });
@@ -214,16 +222,6 @@ var MJPEGReader = (function () {
                 return Promise.resolve(indexes);
             });
         });
-    };
-
-    MJPEGReader._exportJPEG = function (moviList, indexes) {
-        // do not +8, 'movi' string was already ignored.
-        var JPEGs = [];
-        for (var i = 0; i < indexes.length; i++) {
-            if (indexes[i])
-                JPEGs[i] = moviList.blob.slice(indexes[i].byteOffset, indexes[i].byteOffset + indexes[i].byteLength, "image/jpeg");
-        }
-        return JPEGs;
     };
 
     MJPEGReader._consumeStructureHead = function (stream, name, subtype, sliceContainingData) {
@@ -293,10 +291,10 @@ var MJPEGReader = (function () {
     return MJPEGReader;
 })();
 
-var MJPEG = (function () {
-    function MJPEG() {
+var MJPEGVideo = (function () {
+    function MJPEGVideo() {
     }
-    Object.defineProperty(MJPEG.prototype, "framePerSecond", {
+    Object.defineProperty(MJPEGVideo.prototype, "framePerSecond", {
         get: function () {
             return 1 / this.frameInterval;
         },
@@ -304,7 +302,7 @@ var MJPEG = (function () {
         configurable: true
     });
 
-    Object.defineProperty(MJPEG.prototype, "duration", {
+    Object.defineProperty(MJPEGVideo.prototype, "duration", {
         get: function () {
             return this.totalFrames * this.frameInterval;
         },
@@ -312,39 +310,43 @@ var MJPEG = (function () {
         configurable: true
     });
 
-    MJPEG.prototype.getFrame = function (index) {
+    MJPEGVideo.prototype.getFrame = function (index) {
         var backward = this.getBackwardFrame(index);
         if (backward)
             return backward.data;
         else
             return;
     };
-    MJPEG.prototype.getFrameByTime = function (time) {
+    MJPEGVideo.prototype.getFrameByTime = function (time) {
         return this.getFrame(Math.floor(this.totalFrames * time / this.duration));
     };
 
-    MJPEG.prototype.getBackwardFrame = function (index) {
+    MJPEGVideo.prototype.getBackwardFrame = function (index) {
         var i = index;
         while (i >= 0) {
-            if (this.frames[i])
-                return { index: i, data: this.frames[i] };
+            if (this.frameIndices[i])
+                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
             else
                 i--;
         }
         return;
     };
 
-    MJPEG.prototype.getForwardFrame = function (index) {
+    MJPEGVideo.prototype.getForwardFrame = function (index) {
         var i = index;
         while (i < this.totalFrames) {
-            if (this.frames[i])
-                return { index: i, data: this.frames[i] };
+            if (this.frameIndices[i])
+                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
             else
                 i++;
         }
         return;
     };
-    return MJPEG;
+
+    MJPEGVideo.prototype._exportJPEG = function (frameIndex) {
+        return this.blob.slice(frameIndex.byteOffset, frameIndex.byteOffset + frameIndex.byteLength, "image/jpeg");
+    };
+    return MJPEGVideo;
 })();
 var __extends = this.__extends || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];

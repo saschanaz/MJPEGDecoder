@@ -6,13 +6,13 @@
 "use strict";
 
 interface AVIGeneralStructure {
-    name: string; // former type
+    name: string;
     size: number;
-    subtype: string; // former name
+    subtype: string;
     slicedData?: BlobStream;
 }
 interface AVIGeneralChunk {
-    id: string; // former name
+    id: string;
     size: number;
 }
 interface AVIMainHeader {
@@ -25,22 +25,30 @@ interface AVIOldIndex {
     byteOffset: number;
     byteLength: number;
 }
+
+/*
+TODO
+Return MJPEGVideo object when indices starts to be read.
+Push each index as it is parsed -> _pushFrameIndices(frameIndex, frameNumber)
+_pushFrameIndices should run _fulfilled(i)
+_fulfilled is dynamically defined by getBackwardFrame/getForwardFrame, which resolved their Promises
+turn completed token on when all indices are parsed
+getBackwardFrame and getForwardFrame should return Promises, as it should wait until the requested frame gets fulfilled
+getBackwardFrame/getForwardFrame(i) waits until frameIndices gets larger than i + 1
+getBackwardFrame then finds the penultimate valid frame, while getForwardFrame gets last one.
+*/
 class MJPEGReader {
-    /*
-    More memory usage saving
-    Do not save image blobs all together, but just parse their offset and size.
-    The offset of movi list should be saved to be used later.
-    */
     static read(file: Blob) {
         var stream = new BlobStream(file);
         return this._consumeRiff(stream)
             .then((aviMJPEG) => {
-                var mjpeg = new MJPEG();
+                var mjpeg = new MJPEGVideo();
+                mjpeg.blob = file;
                 mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
                 mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
                 mjpeg.width = aviMJPEG.mainHeader.width;
                 mjpeg.height = aviMJPEG.mainHeader.height;
-                mjpeg.frames = aviMJPEG.JPEGs;
+                mjpeg.frameIndices = aviMJPEG.indices;
                 return mjpeg;
             });
     }
@@ -48,9 +56,9 @@ class MJPEGReader {
     private static _consumeRiff(stream: BlobStream) {
         var riffData = {
             mainHeader: <AVIMainHeader>null,
-            JPEGs: <Blob[]>null
+            indices: <AVIOldIndex[]>null
         };
-        var moviStream: BlobStream;
+        var moviPosition: number;
 
         return this._consumeStructureHead(stream, "RIFF", "AVI ")
             .then(() => {
@@ -59,10 +67,9 @@ class MJPEGReader {
                 riffData.mainHeader = hdrlList.mainHeader;
                 return this._consumeMovi(stream);
             }).then((moviList) => {
-                moviStream = moviList.dataStream;
-                return this._consumeAVIIndex(stream);
-            }).then((indexes) => {
-                riffData.JPEGs = this._exportJPEG(moviStream, indexes);
+                return this._consumeAVIIndex(stream, moviList.offset);
+            }).then((indices) => {
+                riffData.indices = indices;
                 return riffData;
             });
     }
@@ -124,11 +131,13 @@ class MJPEGReader {
 
     private static _consumeMovi(stream: BlobStream) {
         var moviData = {
-            dataStream: <BlobStream>null
+            offset: 0,
+            size: 0
         };
-        return this._consumeStructureHead(stream, "LIST", "movi", true)
+        return this._consumeStructureHead(stream, "LIST", "movi")
             .then((structure) => {
-                moviData.dataStream = structure.slicedData;
+                moviData.offset = stream.byteOffset;
+                moviData.size = structure.size;
                 return stream.seek(stream.byteOffset + structure.size);
             }).then(() => {
                 return moviData;
@@ -136,7 +145,7 @@ class MJPEGReader {
         //return { dataArray: moviList };
     }
 
-    private static _consumeAVIIndex(stream: BlobStream) {
+    private static _consumeAVIIndex(stream: BlobStream, moviOffset: number) {
         return this._consumeChunkHead(stream, "idx1")
             .then((indexChunk) => {
                 var indexes: AVIOldIndex[] = [];
@@ -154,10 +163,10 @@ class MJPEGReader {
                             }).then(() => {
                                 return this._consumeUint32(stream);
                             }).then((offset) => {
-                                index.byteOffset = offset + 4; // ignore 'movi' string
+                                index.byteOffset = moviOffset + offset + 4; // ignore 'movi' string and frame chunk header (-4 + 8)
                                 return this._consumeUint32(stream);
                             }).then((length) => {
-                                index.byteLength = length;
+                                index.byteLength = length - 8; // ignore frame chunk header size
                                 if (length > 0)
                                     indexes[i] = index;
                             });
@@ -167,17 +176,6 @@ class MJPEGReader {
                     return Promise.resolve(indexes);
                 });
             });
-    }
-
-    private static _exportJPEG(moviList: BlobStream, indexes: AVIOldIndex[]) {
-        // do not +8, 'movi' string was already ignored.
-
-        var JPEGs: Blob[] = [];
-        for (var i = 0; i < indexes.length; i++) {
-            if (indexes[i])
-                JPEGs[i] = moviList.blob.slice(indexes[i].byteOffset, indexes[i].byteOffset + indexes[i].byteLength, "image/jpeg");
-        }
-        return JPEGs;
     }
 
     private static _consumeStructureHead(stream: BlobStream, name: string, subtype: string, sliceContainingData = false): Promise<AVIGeneralStructure> {
@@ -244,7 +242,9 @@ class MJPEGReader {
     }
 }
 
-class MJPEG {
+class MJPEGVideo {
+    blob: Blob;
+
     frameInterval: number;//seconds. Please convert it from microseconds
     get framePerSecond() {
         return 1 / this.frameInterval;
@@ -255,7 +255,7 @@ class MJPEG {
     }
     width: number;
     height: number;
-    frames: Blob[];
+    frameIndices: AVIOldIndex[];
 
     getFrame(index: number) {
         var backward = this.getBackwardFrame(index);
@@ -271,8 +271,8 @@ class MJPEG {
     getBackwardFrame(index: number) {
         var i = index;
         while (i >= 0) {
-            if (this.frames[i])
-                return { index: i, data: this.frames[i] };
+            if (this.frameIndices[i])
+                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
             else
                 i--;
         }
@@ -282,11 +282,15 @@ class MJPEG {
     getForwardFrame(index: number) {
         var i = index;
         while (i < this.totalFrames) {
-            if (this.frames[i])
-                return { index: i, data: this.frames[i] };
+            if (this.frameIndices[i])
+                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
             else
                 i++;
         }
         return;
+    }
+
+    private _exportJPEG(frameIndex: AVIOldIndex) {    
+        return this.blob.slice(frameIndex.byteOffset, frameIndex.byteOffset + frameIndex.byteLength, "image/jpeg");
     }
 }

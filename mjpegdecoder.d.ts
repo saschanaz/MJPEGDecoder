@@ -1,4 +1,4 @@
-declare class _H264LosslessEncoder {
+﻿declare class _H264LosslessEncoder {
     static SPS: number[];
     static PPS: number[];
     static sliceHeader: number[];
@@ -27,26 +27,26 @@ interface AVIOldIndex {
     byteLength: number;
 }
 declare class MJPEGReader {
-    static read(file: Blob): Promise<MJPEG>;
+    static read(file: Blob): Promise<MJPEGVideo>;
     private static _consumeRiff(stream);
     private static _consumeHdrl(stream);
     private static _consumeAVIMainHeader(stream);
     private static _consumeMovi(stream);
-    private static _consumeAVIIndex(stream);
-    private static _exportJPEG(moviList, indexes);
+    private static _consumeAVIIndex(stream, moviOffset);
     private static _consumeStructureHead(stream, name, subtype, sliceContainingData?);
     private static _consumeChunkHead(stream, id);
     private static _consumeFourCC(stream);
     private static _consumeUint32(stream);
 }
-declare class MJPEG {
+declare class MJPEGVideo {
+    public blob: Blob;
     public frameInterval: number;
     public framePerSecond : number;
     public totalFrames: number;
     public duration : number;
     public width: number;
     public height: number;
-    public frames: Blob[];
+    public frameIndices: AVIOldIndex[];
     public getFrame(index: number): Blob;
     public getFrameByTime(time: number): Blob;
     public getBackwardFrame(index: number): {
@@ -57,6 +57,7 @@ declare class MJPEG {
         index: number;
         data: Blob;
     };
+    private _exportJPEG(frameIndex);
 }
 declare module MP4Container {
     class Box {
