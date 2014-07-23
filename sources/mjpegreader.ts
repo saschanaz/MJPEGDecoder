@@ -14,7 +14,6 @@ interface AVIGeneralStructure {
 interface AVIGeneralChunk {
     id: string; // former name
     size: number;
-    slicedData?: BlobStream;
 }
 interface AVIMainHeader {
     frameIntervalMicroseconds: number;
@@ -221,6 +220,8 @@ class MJPEGReader {
                 head.id = idParam;
                 return this._consumeUint32(stream);
             }).then((sizeParam) => { // get size
+                head.size = sizeParam;
+
                 if (head.id === id)
                     return Promise.resolve(head);
                 else if (head.id === "JUNK")

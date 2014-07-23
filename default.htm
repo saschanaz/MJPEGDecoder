@@ -11,10 +11,23 @@
     <script src="submodules/streams/streams.js"></script>
 
     <script src="mjpegdecoder.js"></script>
+
+    <script>
+        function decode() {
+            MJPEGReader.read(loader.files[0])
+                .then(function (mjpeg) {
+                    window.mjpeg = mjpeg;
+                    console.log("Decode completed.");
+                });
+        }
+    </script>
 </head>
 <body>
     <h1>TypeScript HTML App</h1>
 
-    <div id="content"></div>
+    <div id="content">
+        <label for="loader">Load File: </label><input id="loader" type="file" />
+        <input type="button" value="Push to decode" onclick="decode()" />
+    </div>
 </body>
 </html>

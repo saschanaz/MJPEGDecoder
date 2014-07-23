@@ -15,7 +15,6 @@ interface AVIGeneralStructure {
 interface AVIGeneralChunk {
     id: string;
     size: number;
-    slicedData?: BlobStream;
 }
 interface AVIMainHeader {
     frameIntervalMicroseconds: number;
