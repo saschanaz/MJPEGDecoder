@@ -79,12 +79,16 @@ var _H264LosslessEncoder = (function () {
 TODO
 Return MJPEGVideo object when indices starts to be read.
 Push each index as it is parsed -> _pushFrameIndices(frameIndex, frameNumber)
-_pushFrameIndices should run _fulfilled(i)
-_fulfilled is dynamically defined by getBackwardFrame/getForwardFrame, which resolved their Promises
+_pushFrameIndices should run _fill(i)
+_fill is dynamically defined by getBackwardFrame/getForwardFrame, which resolves their Promises
 turn completed token on when all indices are parsed
 getBackwardFrame and getForwardFrame should return Promises, as it should wait until the requested frame gets fulfilled
 getBackwardFrame/getForwardFrame(i) waits until frameIndices gets larger than i + 1
 getBackwardFrame then finds the penultimate valid frame, while getForwardFrame gets last one.
+OR
+Instead change MJPEGReader to MJPEGStream object which returns a frame when requested
+Problem: It still gives files rather than indices.
+MJPEGVideo would be prefered as of now.
 */
 var MJPEGReader = (function () {
     function MJPEGReader() {
