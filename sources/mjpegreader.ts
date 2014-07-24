@@ -9,12 +9,15 @@ interface AVIGeneralStructure {
     name: string;
     size: number;
     subtype: string;
-    slicedData?: BlobStream;
+    slicedContent?: BlobStream;
+    contentOffset: number;
 }
 interface AVIGeneralChunk {
     id: string;
     size: number;
+    contentOffset: number;
 }
+
 interface AVIMainHeader {
     frameIntervalMicroseconds: number;
     totalFrames: number;
@@ -49,24 +52,31 @@ class MJPEGReader {
     static read(file: Blob) {
         var stream = new BlobStream(file);
         return this._consumeRiff(stream)
-            .then((aviMJPEG) => {
+            .then((aviMJPEG) => new Promise((resolve, reject) => {
                 var mjpeg = new MJPEGVideo();
                 mjpeg.blob = file;
                 mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
                 mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
                 mjpeg.width = aviMJPEG.mainHeader.width;
                 mjpeg.height = aviMJPEG.mainHeader.height;
-                mjpeg.frameIndices = aviMJPEG.indices;
-                return mjpeg;
-            });
+                resolve(mjpeg);
+
+                //after resolving
+                this._parseAVIIndex(stream, aviMJPEG.movi, aviMJPEG.idx1,
+                    (frameNumber, frameIndex) => {
+                        mjpeg.fillFrameIndex(frameNumber, frameIndex);
+                    }).then(() => {
+                        mjpeg.fillFrameIndex(Infinity);
+                    });
+            }));
     }
 
     private static _consumeRiff(stream: BlobStream) {
         var riffData = {
             mainHeader: <AVIMainHeader>null,
-            indices: <AVIOldIndex[]>null
+            movi: <AVIGeneralStructure>null,
+            idx1: <AVIGeneralChunk>null
         };
-        var moviPosition: number;
 
         return this._consumeStructureHead(stream, "RIFF", "AVI ")
             .then(() => {
@@ -74,10 +84,11 @@ class MJPEGReader {
             }).then((hdrlList) => {
                 riffData.mainHeader = hdrlList.mainHeader;
                 return this._consumeMovi(stream);
-            }).then((moviList) => {
-                return this._consumeAVIIndex(stream, moviList.offset);
-            }).then((indices) => {
-                riffData.indices = indices;
+            }).then((movi) => {
+                riffData.movi = movi;
+                return this._consumeAVIIndex(stream);
+            }).then((idx1) => {
+                riffData.idx1 = idx1;
                 return riffData;
             });
     }
@@ -138,28 +149,36 @@ class MJPEGReader {
     }
 
     private static _consumeMovi(stream: BlobStream) {
-        var moviData = {
-            offset: 0,
-            size: 0
-        };
+        var moviStructure: AVIGeneralStructure;
         return this._consumeStructureHead(stream, "LIST", "movi")
             .then((structure) => {
-                moviData.offset = stream.byteOffset;
-                moviData.size = structure.size;
+                moviStructure = structure;
                 return stream.seek(stream.byteOffset + structure.size);
             }).then(() => {
-                return moviData;
+                return moviStructure;
             });
         //return { dataArray: moviList };
     }
 
-    private static _consumeAVIIndex(stream: BlobStream, moviOffset: number) {
+    private static _consumeAVIIndex(stream: BlobStream) {
+        var idx1Chunk: AVIGeneralChunk;
         return this._consumeChunkHead(stream, "idx1")
-            .then((indexChunk) => {
+            .then((chunk) => {
+                idx1Chunk = chunk;
+                return stream.seek(stream.byteOffset + chunk.size);
+            }).then(() => {
+                return idx1Chunk;
+            });
+    }
+
+    private static _parseAVIIndex(stream: BlobStream, movi: AVIGeneralStructure, idx1: AVIGeneralChunk, onframeparse?: (frameNumber: number, frameIndex: AVIOldIndex) => any) {
+        return stream.seek(idx1.contentOffset)
+            .then(() => {
+                
                 var indexes: AVIOldIndex[] = [];
 
                 var sequence = Promise.resolve<void>();
-                for (var i = 0; i < indexChunk.size / 16; i++) {
+                for (var i = 0; i < idx1.size / 16; i++) {
                     ((i: number) => {
                         var index: AVIOldIndex = {
                             byteOffset: 0,
@@ -171,12 +190,15 @@ class MJPEGReader {
                             }).then(() => {
                                 return this._consumeUint32(stream);
                             }).then((offset) => {
-                                index.byteOffset = moviOffset + offset + 4; // ignore 'movi' string and frame chunk header (-4 + 8)
+                                index.byteOffset = movi.contentOffset + offset + 4; // ignore 'movi' string and frame chunk header (-4 + 8)
                                 return this._consumeUint32(stream);
                             }).then((length) => {
                                 index.byteLength = length - 8; // ignore frame chunk header size
-                                if (length > 0)
+                                if (length > 0) {
+                                    if (onframeparse)
+                                        onframeparse(i, index);
                                     indexes[i] = index;
+                                }
                             });
                     })(i);
                 }
@@ -186,7 +208,7 @@ class MJPEGReader {
             });
     }
 
-    private static _consumeStructureHead(stream: BlobStream, name: string, subtype: string, sliceContainingData = false): Promise<AVIGeneralStructure> {
+    private static _consumeStructureHead(stream: BlobStream, name: string, subtype: string, sliceContent = false): Promise<AVIGeneralStructure> {
         var head: AVIGeneralStructure = <any>{};
 
         return this._consumeFourCC(stream)
@@ -195,18 +217,20 @@ class MJPEGReader {
                 return this._consumeUint32(stream);
             }).then((sizeParam) => { // get length
                 head.size = sizeParam - 4; // size without subtype
+
                 if (head.name === name)
                     return this._consumeFourCC(stream).then((subtypeParam) => { // get subtype
                         if (subtypeParam !== subtype)
                             return Promise.reject(new Error("Unexpected name is detected for AVI structure."));
 
-                        if (sliceContainingData)
-                            head.slicedData = stream.slice(stream.byteOffset, stream.byteOffset + head.size);
+                        head.contentOffset = stream.byteOffset;
+                        if (sliceContent)
+                            head.slicedContent = stream.slice(stream.byteOffset, stream.byteOffset + head.size);
                         return Promise.resolve(head);    
                     });
                 else if (head.name === "JUNK")
                     return stream.seek(stream.byteOffset + sizeParam)
-                        .then(() => this._consumeStructureHead(stream, name, subtype, sliceContainingData));
+                        .then(() => this._consumeStructureHead(stream, name, subtype, sliceContent));
                 else
                     return Promise.reject(new Error("Incorrect AVI format."));
             });
@@ -221,8 +245,10 @@ class MJPEGReader {
             }).then((sizeParam) => { // get size
                 head.size = sizeParam;
 
-                if (head.id === id)
+                if (head.id === id) {
+                    head.contentOffset = stream.byteOffset;
                     return Promise.resolve(head);
+                }
                 else if (head.id === "JUNK")
                     return stream.seek(stream.byteOffset + sizeParam)
                         .then(() => this._consumeChunkHead(stream, id));
@@ -263,7 +289,7 @@ class MJPEGVideo {
     }
     width: number;
     height: number;
-    frameIndices: AVIOldIndex[];
+    frameIndices: AVIOldIndex[] = [];
 
     _onfulfilled: (frameNumber: number) => void;
     fillFrameIndex(frameNumber: number, frameIndex?: AVIOldIndex) {

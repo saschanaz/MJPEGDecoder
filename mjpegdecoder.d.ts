@@ -10,11 +10,13 @@ interface AVIGeneralStructure {
     name: string;
     size: number;
     subtype: string;
-    slicedData?: BlobStream;
+    slicedContent?: BlobStream;
+    contentOffset: number;
 }
 interface AVIGeneralChunk {
     id: string;
     size: number;
+    contentOffset: number;
 }
 interface AVIMainHeader {
     frameIntervalMicroseconds: number;
@@ -27,13 +29,14 @@ interface AVIOldIndex {
     byteLength: number;
 }
 declare class MJPEGReader {
-    static read(file: Blob): Promise<MJPEGVideo>;
+    static read(file: Blob): Promise<{}>;
     private static _consumeRiff(stream);
     private static _consumeHdrl(stream);
     private static _consumeAVIMainHeader(stream);
     private static _consumeMovi(stream);
-    private static _consumeAVIIndex(stream, moviOffset);
-    private static _consumeStructureHead(stream, name, subtype, sliceContainingData?);
+    private static _consumeAVIIndex(stream);
+    private static _parseAVIIndex(stream, movi, idx1, onframeparse?);
+    private static _consumeStructureHead(stream, name, subtype, sliceContent?);
     private static _consumeChunkHead(stream, id);
     private static _consumeFourCC(stream);
     private static _consumeUint32(stream);

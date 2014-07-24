@@ -95,16 +95,25 @@ var MJPEGReader = (function () {
     function MJPEGReader() {
     }
     MJPEGReader.read = function (file) {
+        var _this = this;
         var stream = new BlobStream(file);
         return this._consumeRiff(stream).then(function (aviMJPEG) {
-            var mjpeg = new MJPEGVideo();
-            mjpeg.blob = file;
-            mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
-            mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
-            mjpeg.width = aviMJPEG.mainHeader.width;
-            mjpeg.height = aviMJPEG.mainHeader.height;
-            mjpeg.frameIndices = aviMJPEG.indices;
-            return mjpeg;
+            return new Promise(function (resolve, reject) {
+                var mjpeg = new MJPEGVideo();
+                mjpeg.blob = file;
+                mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;
+                mjpeg.totalFrames = aviMJPEG.mainHeader.totalFrames;
+                mjpeg.width = aviMJPEG.mainHeader.width;
+                mjpeg.height = aviMJPEG.mainHeader.height;
+                resolve(mjpeg);
+
+                //after resolving
+                _this._parseAVIIndex(stream, aviMJPEG.movi, aviMJPEG.idx1, function (frameNumber, frameIndex) {
+                    mjpeg.fillFrameIndex(frameNumber, frameIndex);
+                }).then(function () {
+                    mjpeg.fillFrameIndex(Infinity);
+                });
+            });
         });
     };
 
@@ -112,19 +121,20 @@ var MJPEGReader = (function () {
         var _this = this;
         var riffData = {
             mainHeader: null,
-            indices: null
+            movi: null,
+            idx1: null
         };
-        var moviPosition;
 
         return this._consumeStructureHead(stream, "RIFF", "AVI ").then(function () {
             return _this._consumeHdrl(stream);
         }).then(function (hdrlList) {
             riffData.mainHeader = hdrlList.mainHeader;
             return _this._consumeMovi(stream);
-        }).then(function (moviList) {
-            return _this._consumeAVIIndex(stream, moviList.offset);
-        }).then(function (indices) {
-            riffData.indices = indices;
+        }).then(function (movi) {
+            riffData.movi = movi;
+            return _this._consumeAVIIndex(stream);
+        }).then(function (idx1) {
+            riffData.idx1 = idx1;
             return riffData;
         });
     };
@@ -183,27 +193,33 @@ var MJPEGReader = (function () {
     };
 
     MJPEGReader._consumeMovi = function (stream) {
-        var moviData = {
-            offset: 0,
-            size: 0
-        };
+        var moviStructure;
         return this._consumeStructureHead(stream, "LIST", "movi").then(function (structure) {
-            moviData.offset = stream.byteOffset;
-            moviData.size = structure.size;
+            moviStructure = structure;
             return stream.seek(stream.byteOffset + structure.size);
         }).then(function () {
-            return moviData;
+            return moviStructure;
         });
         //return { dataArray: moviList };
     };
 
-    MJPEGReader._consumeAVIIndex = function (stream, moviOffset) {
+    MJPEGReader._consumeAVIIndex = function (stream) {
+        var idx1Chunk;
+        return this._consumeChunkHead(stream, "idx1").then(function (chunk) {
+            idx1Chunk = chunk;
+            return stream.seek(stream.byteOffset + chunk.size);
+        }).then(function () {
+            return idx1Chunk;
+        });
+    };
+
+    MJPEGReader._parseAVIIndex = function (stream, movi, idx1, onframeparse) {
         var _this = this;
-        return this._consumeChunkHead(stream, "idx1").then(function (indexChunk) {
+        return stream.seek(idx1.contentOffset).then(function () {
             var indexes = [];
 
             var sequence = Promise.resolve();
-            for (var i = 0; i < indexChunk.size / 16; i++) {
+            for (var i = 0; i < idx1.size / 16; i++) {
                 (function (i) {
                     var index = {
                         byteOffset: 0,
@@ -214,12 +230,15 @@ var MJPEGReader = (function () {
                     }).then(function () {
                         return _this._consumeUint32(stream);
                     }).then(function (offset) {
-                        index.byteOffset = moviOffset + offset + 4; // ignore 'movi' string and frame chunk header (-4 + 8)
+                        index.byteOffset = movi.contentOffset + offset + 4; // ignore 'movi' string and frame chunk header (-4 + 8)
                         return _this._consumeUint32(stream);
                     }).then(function (length) {
                         index.byteLength = length - 8; // ignore frame chunk header size
-                        if (length > 0)
+                        if (length > 0) {
+                            if (onframeparse)
+                                onframeparse(i, index);
                             indexes[i] = index;
+                        }
                     });
                 })(i);
             }
@@ -229,9 +248,9 @@ var MJPEGReader = (function () {
         });
     };
 
-    MJPEGReader._consumeStructureHead = function (stream, name, subtype, sliceContainingData) {
+    MJPEGReader._consumeStructureHead = function (stream, name, subtype, sliceContent) {
         var _this = this;
-        if (typeof sliceContainingData === "undefined") { sliceContainingData = false; }
+        if (typeof sliceContent === "undefined") { sliceContent = false; }
         var head = {};
 
         return this._consumeFourCC(stream).then(function (nameParam) {
@@ -239,18 +258,20 @@ var MJPEGReader = (function () {
             return _this._consumeUint32(stream);
         }).then(function (sizeParam) {
             head.size = sizeParam - 4; // size without subtype
+
             if (head.name === name)
                 return _this._consumeFourCC(stream).then(function (subtypeParam) {
                     if (subtypeParam !== subtype)
                         return Promise.reject(new Error("Unexpected name is detected for AVI structure."));
 
-                    if (sliceContainingData)
-                        head.slicedData = stream.slice(stream.byteOffset, stream.byteOffset + head.size);
+                    head.contentOffset = stream.byteOffset;
+                    if (sliceContent)
+                        head.slicedContent = stream.slice(stream.byteOffset, stream.byteOffset + head.size);
                     return Promise.resolve(head);
                 });
             else if (head.name === "JUNK")
                 return stream.seek(stream.byteOffset + sizeParam).then(function () {
-                    return _this._consumeStructureHead(stream, name, subtype, sliceContainingData);
+                    return _this._consumeStructureHead(stream, name, subtype, sliceContent);
                 });
             else
                 return Promise.reject(new Error("Incorrect AVI format."));
@@ -266,9 +287,10 @@ var MJPEGReader = (function () {
         }).then(function (sizeParam) {
             head.size = sizeParam;
 
-            if (head.id === id)
+            if (head.id === id) {
+                head.contentOffset = stream.byteOffset;
                 return Promise.resolve(head);
-            else if (head.id === "JUNK")
+            } else if (head.id === "JUNK")
                 return stream.seek(stream.byteOffset + sizeParam).then(function () {
                     return _this._consumeChunkHead(stream, id);
                 });
@@ -298,6 +320,7 @@ var MJPEGReader = (function () {
 
 var MJPEGVideo = (function () {
     function MJPEGVideo() {
+        this.frameIndices = [];
     }
     Object.defineProperty(MJPEGVideo.prototype, "framePerSecond", {
         get: function () {
