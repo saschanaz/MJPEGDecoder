@@ -46,8 +46,8 @@
             });
         }
         function auto() {
-            var startedTime = Date.now() / 1000;
-            var startedVideoTime = currentVideoTime;
+            var referenceTime = Date.now() / 1000;
+            var referenceVideoTime = currentVideoTime;
 
             var sequence = Promise.resolve();
             var playNext = function () {
@@ -56,7 +56,12 @@
                     return;
                 }
 
-                var targetTime = startedVideoTime + Date.now() / 1000 - startedTime;
+                var targetTime = referenceVideoTime + Date.now() / 1000 - referenceTime;
+                if (targetTime - currentVideoTime > 0.1) {
+                    referenceTime = Date.now() / 1000;
+                    referenceVideoTime = currentVideoTime;
+                    targetTime = referenceVideoTime + 0.1;
+                }
                 if (targetTime < exported.duration) {
                     sequence = sequence.then(promiseImmediate).then(playNext);
                     return show(targetTime);
