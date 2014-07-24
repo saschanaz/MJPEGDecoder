@@ -27,7 +27,12 @@
         function show(time) {
             currentVideoTime = time;
             timer.value = time;
-            presenter.src = URL.createObjectURL(exported.getFrameByTime(time), { oneTimeOnly: true });
+            exported.getFrameByTime(time).then(function (frame) {
+                if (!frame)
+                    return;
+
+                presenter.src = URL.createObjectURL(frame, { oneTimeOnly: true });
+            });
         }
         function auto() {
             var startedTime = Date.now() / 1000;
