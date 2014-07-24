@@ -13,6 +13,17 @@
     <script src="mjpegdecoder.js"></script>
 
     <script>
+        //setImmediate polyfill
+        if (!window.setImmediate) {
+            window.setImmediate = function (expression) {
+                var args = [];
+                for (var _i = 0; _i < (arguments.length - 1) ; _i++) {
+                    args[_i] = arguments[_i + 1];
+                }
+                return window.setTimeout.apply(window, [expression, 0].concat(args));
+            };
+        }
+
         var exported;
         var currentVideoTime = 0;
         var stopToken = false;
@@ -27,7 +38,7 @@
         function show(time) {
             currentVideoTime = time;
             timer.value = time;
-            exported.getFrameByTime(time).then(function (frame) {
+            return exported.getFrameByTime(time).then(function (frame) {
                 if (!frame)
                     return;
 
@@ -37,7 +48,9 @@
         function auto() {
             var startedTime = Date.now() / 1000;
             var startedVideoTime = currentVideoTime;
-            var asyncOperation = function () {
+
+            var sequence = Promise.resolve();
+            var playNext = function () {
                 if (stopToken) {
                     stopToken = false;
                     return;
@@ -45,13 +58,35 @@
 
                 var targetTime = startedVideoTime + Date.now() / 1000 - startedTime;
                 if (targetTime < exported.duration) {
-                    show(targetTime);
-                    window.setTimeout(asyncOperation, 10);
+                    sequence = sequence.then(promiseImmediate).then(playNext);
+                    return show(targetTime);
                 }
                 else
-                    show(exported.duration);
+                    return show(exported.duration);
             };
-            asyncOperation();
+            sequence.then(promiseImmediate).then(playNext);
+            //var asyncOperation = function () {
+            //    if (stopToken) {
+            //        stopToken = false;
+            //        return;
+            //    }
+
+            //    var targetTime = startedVideoTime + Date.now() / 1000 - startedTime;
+            //    if (targetTime < exported.duration) {
+            //        show(targetTime);
+            //        window.setTimeout(asyncOperation, 10);
+            //    }
+            //    else
+            //        show(exported.duration);
+            //};
+            //asyncOperation();
+        }
+        function promiseImmediate() {
+            return new Promise(function (resolve, reject) {
+                window.setImmediate(function () {
+                    resolve();
+                });
+            })
         }
     </script>
 </head>
