@@ -70,21 +70,6 @@
                     return show(exported.duration);
             };
             sequence.then(promiseImmediate).then(playNext);
-            //var asyncOperation = function () {
-            //    if (stopToken) {
-            //        stopToken = false;
-            //        return;
-            //    }
-
-            //    var targetTime = startedVideoTime + Date.now() / 1000 - startedTime;
-            //    if (targetTime < exported.duration) {
-            //        show(targetTime);
-            //        window.setTimeout(asyncOperation, 10);
-            //    }
-            //    else
-            //        show(exported.duration);
-            //};
-            //asyncOperation();
         }
         function promiseImmediate() {
             return new Promise(function (resolve, reject) {
@@ -103,9 +88,10 @@
         <input type="button" value="Push to decode" onclick="decode()" />
     </div>
     <div id="image" style="display: none;">
-        <label for="timer">Time: </label><input name="timer" id="timer" type="number" value="0" />
-        <input type="button" value="Push to show image" onclick="show(parseFloat(timer.value))" /><br />
-        <input type="button" value="Play" onclick="auto()" /><input type="button" value="Stop" onclick="stopToken = true;" /><br />
+        <label for="timer">Time: </label><input name="timer" id="timer" type="number" value="0" onkeydown="if (event.key === 'Enter') showButton.click()" />
+        <input type="button" id="showButton" value="Push to show image" onclick="show(parseFloat(timer.value))" /><br />
+        <input type="button" id="playButton" value="Play" onclick="this.disabled = 'disabled'; stopButton.removeAttribute('disabled'); auto();" />
+        <input type="button" id="stopButton" value="Stop" onclick="this.disabled = 'disabled'; playButton.removeAttribute('disabled'); stopToken = true;" disabled="disabled" /><br />
         <img id="presenter" />
     </div>
 </body>
