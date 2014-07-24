@@ -33,6 +33,7 @@ Push each index as it is parsed -> _pushFrameIndices(frameIndex, frameNumber)
 _pushFrameIndices should run _fill(i)
 _fill is dynamically defined by getBackwardFrame/getForwardFrame, which resolves their Promises
 turn completed token on when all indices are parsed
+-> CHANGED: call fillFrame(Infinity) to finish all waitings.
 getBackwardFrame and getForwardFrame should return Promises, as it should wait until the requested frame gets fulfilled
 getBackwardFrame/getForwardFrame(i) waits until frameIndices gets larger than i + 1
 getBackwardFrame then finds the penultimate valid frame, while getForwardFrame gets last one.
@@ -274,11 +275,12 @@ class MJPEGVideo {
     }
 
     getFrame(index: number) {
-        var backward = this.getBackwardFrame(index);
-        if (backward)
-            return backward.data;
-        else
-            return;
+        return this.getBackwardFrame(index).then((frameIndex) => {
+            if (frameIndex)
+                return frameIndex.data;
+            else
+                return;
+        });
     }
     getFrameByTime(time: number) {
         return this.getFrame(Math.floor(this.totalFrames * time / this.duration));

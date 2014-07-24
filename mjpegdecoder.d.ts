@@ -48,17 +48,21 @@ declare class MJPEGVideo {
     public height: number;
     public frameIndices: AVIOldIndex[];
     public _onfulfilled: (frameNumber: number) => void;
-    public fillFrameIndex(frameNumber: number, frameIndex: AVIOldIndex): void;
-    public getFrame(index: number): Blob;
-    public getFrameByTime(time: number): Blob;
-    public getBackwardFrame(index: number): {
+    public fillFrameIndex(frameNumber: number, frameIndex?: AVIOldIndex): void;
+    public getFrame(index: number): Promise<Blob>;
+    public getFrameByTime(time: number): Promise<Blob>;
+    /**
+    Wait until the existence of target frame gets confirmed.
+    */
+    private _waitFrame(index);
+    public getBackwardFrame(index: number): Promise<{
         index: number;
         data: Blob;
-    };
-    public getForwardFrame(index: number): {
+    }>;
+    public getForwardFrame(index: number): Promise<{
         index: number;
         data: Blob;
-    };
+    }>;
     private _exportJPEG(frameIndex);
 }
 declare module MP4Container {
