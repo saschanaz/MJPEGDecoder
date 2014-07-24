@@ -47,6 +47,8 @@ declare class MJPEGVideo {
     public width: number;
     public height: number;
     public frameIndices: AVIOldIndex[];
+    public _onfulfilled: (frameNumber: number) => void;
+    public fillFrameIndex(frameNumber: number, frameIndex: AVIOldIndex): void;
     public getFrame(index: number): Blob;
     public getFrameByTime(time: number): Blob;
     public getBackwardFrame(index: number): {

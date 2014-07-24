@@ -42,7 +42,7 @@ OR
 Instead change MJPEGReader to MJPEGStream object which returns a frame when requested
 Problem: It still gives files rather than indices. 
 
-MJPEGVideo would be prefered as of now.
+Asynchronous MJPEGVideo would be prefered as of now.
 */
 class MJPEGReader {
     static read(file: Blob) {
@@ -264,6 +264,15 @@ class MJPEGVideo {
     height: number;
     frameIndices: AVIOldIndex[];
 
+    _onfulfilled: (frameNumber: number) => void;
+    fillFrameIndex(frameNumber: number, frameIndex?: AVIOldIndex) {
+        if (frameIndex)
+            this.frameIndices[frameNumber] = frameIndex;
+        
+        if (this._onfulfilled)
+            this._onfulfilled(frameNumber);
+    }
+
     getFrame(index: number) {
         var backward = this.getBackwardFrame(index);
         if (backward)
@@ -276,14 +285,26 @@ class MJPEGVideo {
     }
 
     getBackwardFrame(index: number) {
-        var i = index;
-        while (i >= 0) {
-            if (this.frameIndices[i])
-                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
-            else
-                i--;
+        var sequence = Promise.resolve();
+        if (index >= this.frameIndices.length) {
+            sequence = sequence
+                .then(() => new Promise((resolve, reject) => {
+                    this._onfulfilled = (i) => {
+                        if (i >= index)
+                            resolve(i);
+                    };
+                }));
         }
-        return;
+        return sequence.then(() => {
+            var i = index;
+            while (i >= 0) {
+                if (this.frameIndices[i])
+                    return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
+                else
+                    i--;
+            }
+            return;
+        });
     }
 
     getForwardFrame(index: number) {

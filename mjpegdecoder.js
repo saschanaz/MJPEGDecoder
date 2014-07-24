@@ -88,7 +88,7 @@ getBackwardFrame then finds the penultimate valid frame, while getForwardFrame g
 OR
 Instead change MJPEGReader to MJPEGStream object which returns a frame when requested
 Problem: It still gives files rather than indices.
-MJPEGVideo would be prefered as of now.
+Asynchronous MJPEGVideo would be prefered as of now.
 */
 var MJPEGReader = (function () {
     function MJPEGReader() {
@@ -314,6 +314,14 @@ var MJPEGVideo = (function () {
         configurable: true
     });
 
+    MJPEGVideo.prototype.fillFrameIndex = function (frameNumber, frameIndex) {
+        if (frameIndex)
+            this.frameIndices[frameNumber] = frameIndex;
+
+        if (this._onfulfilled)
+            this._onfulfilled(frameNumber);
+    };
+
     MJPEGVideo.prototype.getFrame = function (index) {
         var backward = this.getBackwardFrame(index);
         if (backward)
@@ -326,14 +334,28 @@ var MJPEGVideo = (function () {
     };
 
     MJPEGVideo.prototype.getBackwardFrame = function (index) {
-        var i = index;
-        while (i >= 0) {
-            if (this.frameIndices[i])
-                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
-            else
-                i--;
+        var _this = this;
+        var sequence = Promise.resolve();
+        if (index >= this.frameIndices.length) {
+            sequence = sequence.then(function () {
+                return new Promise(function (resolve, reject) {
+                    _this._onfulfilled = function (i) {
+                        if (i >= index)
+                            resolve(i);
+                    };
+                });
+            });
         }
-        return;
+        return sequence.then(function () {
+            var i = index;
+            while (i >= 0) {
+                if (_this.frameIndices[i])
+                    return { index: i, data: _this._exportJPEG(_this.frameIndices[i]) };
+                else
+                    i--;
+            }
+            return;
+        });
     };
 
     MJPEGVideo.prototype.getForwardFrame = function (index) {
