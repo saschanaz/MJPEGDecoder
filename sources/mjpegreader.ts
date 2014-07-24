@@ -284,18 +284,23 @@ class MJPEGVideo {
         return this.getFrame(Math.floor(this.totalFrames * time / this.duration));
     }
 
+    /**
+    Wait until the existence of target frame gets confirmed.
+    */
+    private _waitFrame(index: number) {
+        if (index < this.frameIndices.length)
+            return Promise.resolve<void>();
+        else
+            return new Promise<void>((resolve, reject) => {
+                this._onfulfilled = (i) => {
+                    if (i >= index)
+                        resolve(undefined);
+                };
+            });
+    }
+
     getBackwardFrame(index: number) {
-        var sequence = Promise.resolve();
-        if (index >= this.frameIndices.length) {
-            sequence = sequence
-                .then(() => new Promise((resolve, reject) => {
-                    this._onfulfilled = (i) => {
-                        if (i >= index)
-                            resolve(i);
-                    };
-                }));
-        }
-        return sequence.then(() => {
+        return this._waitFrame(index).then(() => {
             var i = index;
             while (i >= 0) {
                 if (this.frameIndices[i])
@@ -308,14 +313,16 @@ class MJPEGVideo {
     }
 
     getForwardFrame(index: number) {
-        var i = index;
-        while (i < this.totalFrames) {
-            if (this.frameIndices[i])
-                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
-            else
-                i++;
-        }
-        return;
+        return this._waitFrame(index).then(() => {
+            var i = index;
+            while (i < this.frameIndices.length) { // find target frame within current frame indices
+                if (this.frameIndices[i])
+                    return Promise.resolve({ index: i, data: this._exportJPEG(this.frameIndices[i]) });
+                else
+                    i++;
+            }
+            return;
+        });
     }
 
     private _exportJPEG(frameIndex: AVIOldIndex) {    

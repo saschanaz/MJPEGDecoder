@@ -333,20 +333,25 @@ var MJPEGVideo = (function () {
         return this.getFrame(Math.floor(this.totalFrames * time / this.duration));
     };
 
+    /**
+    Wait until the existence of target frame gets confirmed.
+    */
+    MJPEGVideo.prototype._waitFrame = function (index) {
+        var _this = this;
+        if (index < this.frameIndices.length)
+            return Promise.resolve();
+        else
+            return new Promise(function (resolve, reject) {
+                _this._onfulfilled = function (i) {
+                    if (i >= index)
+                        resolve(undefined);
+                };
+            });
+    };
+
     MJPEGVideo.prototype.getBackwardFrame = function (index) {
         var _this = this;
-        var sequence = Promise.resolve();
-        if (index >= this.frameIndices.length) {
-            sequence = sequence.then(function () {
-                return new Promise(function (resolve, reject) {
-                    _this._onfulfilled = function (i) {
-                        if (i >= index)
-                            resolve(i);
-                    };
-                });
-            });
-        }
-        return sequence.then(function () {
+        return this._waitFrame(index).then(function () {
             var i = index;
             while (i >= 0) {
                 if (_this.frameIndices[i])
@@ -359,14 +364,17 @@ var MJPEGVideo = (function () {
     };
 
     MJPEGVideo.prototype.getForwardFrame = function (index) {
-        var i = index;
-        while (i < this.totalFrames) {
-            if (this.frameIndices[i])
-                return { index: i, data: this._exportJPEG(this.frameIndices[i]) };
-            else
-                i++;
-        }
-        return;
+        var _this = this;
+        return this._waitFrame(index).then(function () {
+            var i = index;
+            while (i < _this.frameIndices.length) {
+                if (_this.frameIndices[i])
+                    return Promise.resolve({ index: i, data: _this._exportJPEG(_this.frameIndices[i]) });
+                else
+                    i++;
+            }
+            return;
+        });
     };
 
     MJPEGVideo.prototype._exportJPEG = function (frameIndex) {
