@@ -39,11 +39,8 @@
             currentVideoTime = time;
             timer.value = time;
             return exported.getFrameByTime(time).then(function (frame) {
-                if (!frame)
-                    return;
-
                 presenter.src = URL.createObjectURL(frame, { oneTimeOnly: true });
-            });
+            }, function () { });
         }
         function auto() {
             var referenceTime = Date.now() / 1000;

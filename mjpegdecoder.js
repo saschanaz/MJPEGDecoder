@@ -383,11 +383,11 @@ var MJPEGVideo = (function () {
             var i = index;
             while (i >= 0) {
                 if (_this.frameIndices[i])
-                    return { index: i, data: _this._exportJPEG(_this.frameIndices[i]) };
+                    return Promise.resolve({ index: i, data: _this._exportJPEG(_this.frameIndices[i]) });
                 else
                     i--;
             }
-            return;
+            return Promise.reject(new Error("No backward frame was found for index " + index + "."));
         });
     };
 
@@ -401,7 +401,7 @@ var MJPEGVideo = (function () {
                 else
                     i++;
             }
-            return;
+            return Promise.reject(new Error("No forward frame was found for index " + index + "."));
         });
     };
 
