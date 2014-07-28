@@ -331,6 +331,7 @@ class MJPEGVideo {
     }
 
     getBackwardFrame(index: number) {
+        index = Math.ceil(index);
         return this._waitFrame(index).then(() => {
             var i = index;
             while (i >= 0) {
@@ -344,6 +345,7 @@ class MJPEGVideo {
     }
 
     getForwardFrame(index: number) {
+        index = Math.floor(index);
         return this._waitFrame(index).then(() => {
             var i = index;
             while (i < this.frameIndices.length) { // find target frame within current frame indices

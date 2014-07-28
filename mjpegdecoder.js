@@ -379,6 +379,7 @@ var MJPEGVideo = (function () {
 
     MJPEGVideo.prototype.getBackwardFrame = function (index) {
         var _this = this;
+        index = Math.ceil(index);
         return this._waitFrame(index).then(function () {
             var i = index;
             while (i >= 0) {
@@ -393,6 +394,7 @@ var MJPEGVideo = (function () {
 
     MJPEGVideo.prototype.getForwardFrame = function (index) {
         var _this = this;
+        index = Math.floor(index);
         return this._waitFrame(index).then(function () {
             var i = index;
             while (i < _this.frameIndices.length) {
