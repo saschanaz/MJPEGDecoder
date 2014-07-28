@@ -363,6 +363,9 @@ var MJPEGVideo = (function () {
     */
     MJPEGVideo.prototype._waitFrame = function (index) {
         var _this = this;
+        if (index >= this.totalFrames || index < 0)
+            return Promise.reject(new Error("Index is outside of range."));
+
         if (index < this.frameIndices.length)
             return Promise.resolve();
         else

@@ -316,6 +316,9 @@ class MJPEGVideo {
     Wait until the existence of target frame gets confirmed.
     */
     private _waitFrame(index: number) {
+        if (index >= this.totalFrames || index < 0)
+            return Promise.reject(new Error("Index is outside of range."));
+
         if (index < this.frameIndices.length)
             return Promise.resolve<void>();
         else
