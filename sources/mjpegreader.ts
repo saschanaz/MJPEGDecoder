@@ -52,7 +52,7 @@ class MJPEGReader {
     static read(file: Blob) {
         var stream = new BlobStream(file);
         return this._consumeRiff(stream)
-            .then((aviMJPEG) => new Promise((resolve, reject) => {
+            .then((aviMJPEG) => new Promise<MJPEGVideo>((resolve, reject) => {
                 var mjpeg = new MJPEGVideo();
                 mjpeg.blob = file;
                 mjpeg.frameInterval = aviMJPEG.mainHeader.frameIntervalMicroseconds / 1e6;

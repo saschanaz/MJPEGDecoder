@@ -1,4 +1,4 @@
-declare class _H264LosslessEncoder {
+﻿declare class _H264LosslessEncoder {
     static SPS: number[];
     static PPS: number[];
     static sliceHeader: number[];
@@ -29,7 +29,7 @@ interface AVIOldIndex {
     byteLength: number;
 }
 declare class MJPEGReader {
-    static read(file: Blob): Promise<{}>;
+    static read(file: Blob): Promise<MJPEGVideo>;
     private static _consumeRiff(stream);
     private static _consumeHdrl(stream);
     private static _consumeAVIMainHeader(stream);
