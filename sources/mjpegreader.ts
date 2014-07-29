@@ -321,13 +321,13 @@ class MJPEGVideo {
 
         if (index < this.frameIndices.length)
             return Promise.resolve<void>();
-        else
-            return new Promise<void>((resolve, reject) => {
-                this._onfulfilled = (i) => {
-                    if (i >= index)
-                        resolve(undefined);
-                };
-            });
+        
+        return new Promise<void>((resolve, reject) => {
+            this._onfulfilled = (i) => {
+                if (i >= index)
+                    resolve(undefined);
+            };
+        });
     }
 
     getBackwardFrame(index: number) {

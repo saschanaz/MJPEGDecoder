@@ -368,13 +368,13 @@ var MJPEGVideo = (function () {
 
         if (index < this.frameIndices.length)
             return Promise.resolve();
-        else
-            return new Promise(function (resolve, reject) {
-                _this._onfulfilled = function (i) {
-                    if (i >= index)
-                        resolve(undefined);
-                };
-            });
+
+        return new Promise(function (resolve, reject) {
+            _this._onfulfilled = function (i) {
+                if (i >= index)
+                    resolve(undefined);
+            };
+        });
     };
 
     MJPEGVideo.prototype.getBackwardFrame = function (index) {
