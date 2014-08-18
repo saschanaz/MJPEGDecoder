@@ -6,6 +6,52 @@
     static encodeFrame(imageData: ImageData): Uint8Array;
     static convertToYUV(rgba: Uint8Array): number[];
 }
+declare class MJPEGPlayer implements VideoPlayable {
+    private static _promiseImmediate();
+    private _src;
+    private _srcUrl;
+    private _element;
+    public element : HTMLImageElement;
+    public src : string;
+    private _getBlobFromUrl(url);
+    public onloadedmetadata: (e: HalfbakedEvent) => any;
+    public onseeked: (e: HalfbakedEvent) => any;
+    /** Stops playing when set to true, automatically returning to false */
+    private _playSessionToken;
+    private _currentVideoTime;
+    public currentTime : number;
+    private _show(time);
+    private _waitToPlay();
+    public play(): void;
+    public pause(): void;
+    public videoWidth : number;
+    public videoHeight : number;
+    public duration : number;
+    private _createEvent();
+}
+interface VideoPlayable {
+    src: string;
+    play(): void;
+    pause(): void;
+    currentTime: number;
+    videoWidth: number;
+    videoHeight: number;
+    duration: number;
+    onseeked: (e: HalfbakedEvent) => any;
+    onloadedmetadata: (e: HalfbakedEvent) => any;
+}
+interface HalfbakedEvent {
+    bubbles: boolean;
+    cancelable: boolean;
+    cancelBubble: boolean;
+    currentTarget: any;
+    defaultPrevented: boolean;
+    eventPhase: number;
+    isTrusted: boolean;
+    target: any;
+    timeStamp: number;
+    type: string;
+}
 interface AVIGeneralStructure {
     name: string;
     size: number;
