@@ -24,56 +24,15 @@
             };
         }
 
-        var exported;
-        var currentVideoTime = 0;
-        var stopToken = false;
+        var player = new MJPEGPlayer();
+        player.autoplay = true;
+        window.addEventListener("DOMContentLoaded", function () {
+            image.appendChild(player.element);
+        });
+
         function decode() {
-            MJPEGReader.read(loader.files[0])
-                .then(function (mjpeg) {
-                    exported = mjpeg;
-                    image.style.display = "block";
-                    console.log("Decode completed.");
-                });
-        }
-        function show(time) {
-            currentVideoTime = time;
-            timer.value = time;
-            return exported.getFrameByTime(time).then(function (frame) {
-                presenter.src = URL.createObjectURL(frame, { oneTimeOnly: true });
-            }, function () { });
-        }
-        function auto() {
-            var referenceTime = Date.now() / 1000;
-            var referenceVideoTime = currentVideoTime;
-
-            var sequence = Promise.resolve();
-            var playNext = function () {
-                if (stopToken) {
-                    stopToken = false;
-                    return;
-                }
-
-                var targetTime = referenceVideoTime + Date.now() / 1000 - referenceTime;
-                if (targetTime - currentVideoTime > 0.1) {
-                    referenceTime = Date.now() / 1000;
-                    referenceVideoTime = currentVideoTime;
-                    targetTime = referenceVideoTime + 0.1;
-                }
-                if (targetTime < exported.duration) {
-                    sequence = sequence.then(promiseImmediate).then(playNext);
-                    return show(targetTime);
-                }
-                else
-                    return show(exported.duration);
-            };
-            sequence.then(promiseImmediate).then(playNext);
-        }
-        function promiseImmediate() {
-            return new Promise(function (resolve, reject) {
-                window.setImmediate(function () {
-                    resolve();
-                });
-            })
+            player.src = URL.createObjectURL(loader.files[0], { oneTimeOnly: true });
+            image.style.display = "";
         }
     </script>
 </head>
@@ -86,10 +45,9 @@
     </div>
     <div id="image" style="display: none;">
         <label for="timer">Time: </label><input name="timer" id="timer" type="number" value="0" onkeydown="if (event.key === 'Enter') showButton.click()" />
-        <input type="button" id="showButton" value="Push to show image" onclick="show(parseFloat(timer.value))" /><br />
-        <input type="button" id="playButton" value="Play" onclick="this.disabled = 'disabled'; stopButton.removeAttribute('disabled'); auto();" />
-        <input type="button" id="stopButton" value="Stop" onclick="this.disabled = 'disabled'; playButton.removeAttribute('disabled'); stopToken = true;" disabled="disabled" /><br />
-        <img id="presenter" />
+        <input type="button" id="showButton" value="Push to show image" onclick="player.currentTime = parseFloat(timer.value)" /><br />
+        <input type="button" id="playButton" value="Play" onclick="this.disabled = 'disabled'; stopButton.removeAttribute('disabled'); player.play()" />
+        <input type="button" id="stopButton" value="Stop" onclick="this.disabled = 'disabled'; playButton.removeAttribute('disabled'); player.pause()" disabled="disabled" /><br />
     </div>
 </body>
 </html>

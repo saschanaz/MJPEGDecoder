@@ -71,6 +71,7 @@ var _H264LosslessEncoder = (function () {
 })();
 var MJPEGPlayer = (function () {
     function MJPEGPlayer() {
+        this._autoplay = false;
         this._src = null;
         this.onloadedmetadata = null;
         this.onseeked = null;
@@ -85,6 +86,17 @@ var MJPEGPlayer = (function () {
             });
         });
     };
+
+    Object.defineProperty(MJPEGPlayer.prototype, "autoplay", {
+        get: function () {
+            return this._autoplay;
+        },
+        set: function (value) {
+            this._autoplay = Boolean(value);
+        },
+        enumerable: true,
+        configurable: true
+    });
 
     Object.defineProperty(MJPEGPlayer.prototype, "element", {
         get: function () {
@@ -119,6 +131,7 @@ var MJPEGPlayer = (function () {
                 });
             else {
                 this._currentVideoTime = -1; // blocks further rendering
+                this.pause();
                 this.element.src = ""; // clear image element
             }
         },
@@ -180,6 +193,8 @@ var MJPEGPlayer = (function () {
     };
     MJPEGPlayer.prototype.play = function () {
         var _this = this;
+        if (this._playSessionToken)
+            return;
         var token = this._playSessionToken = { stop: false };
 
         this._waitToPlay().then(function () {
@@ -187,8 +202,10 @@ var MJPEGPlayer = (function () {
             var referenceVideoTime = _this._currentVideoTime;
 
             var next = function () {
-                if (token.stop)
+                if (token.stop) {
+                    _this._playSessionToken = null;
                     return;
+                }
 
                 var targetTime = referenceVideoTime + Date.now() / 1000 - referenceTime;
                 if (targetTime - _this._currentVideoTime > 0.1) {
@@ -198,8 +215,15 @@ var MJPEGPlayer = (function () {
                 }
                 if (targetTime < _this._src.duration)
                     _this._show(targetTime).then(MJPEGPlayer._promiseImmediate).then(next);
-                else
-                    _this._show(_this._src.duration);
+                else {
+                    _this._show(_this._src.duration).then(function () {
+                        _this._playSessionToken = null;
+                        if (!_this.autoplay)
+                            return;
+                        _this._currentVideoTime = 0;
+                        _this.play();
+                    });
+                }
             };
             MJPEGPlayer._promiseImmediate().then(next);
         });

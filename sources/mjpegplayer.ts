@@ -7,6 +7,10 @@
         });
     }
 
+    private _autoplay = false;
+    get autoplay() { return this._autoplay; }
+    set autoplay(value: boolean) { this._autoplay = Boolean(value); }
+
     private _src: MJPEGVideo = null;
     private _srcUrl: string;
     private _element: HTMLImageElement;
@@ -37,6 +41,7 @@
                 });
         else {
             this._currentVideoTime = -1; // blocks further rendering
+            this.pause();
             this.element.src = ""; // clear image element
         }
     }
@@ -92,6 +97,8 @@
         });
     }
     play() {
+        if (this._playSessionToken)
+            return;
         var token = this._playSessionToken = { stop: false };
 
         this._waitToPlay().then(() => {
@@ -99,8 +106,10 @@
             var referenceVideoTime = this._currentVideoTime;
 
             var next = () => {
-                if (token.stop)
+                if (token.stop) {
+                    this._playSessionToken = null;
                     return;
+                }
 
                 var targetTime = referenceVideoTime + Date.now() / 1000 - referenceTime;
                 if (targetTime - this._currentVideoTime > 0.1) { // is there too much delay?
@@ -110,8 +119,16 @@
                 }
                 if (targetTime < this._src.duration)
                     this._show(targetTime).then(MJPEGPlayer._promiseImmediate).then(next);
-                else
-                    this._show(this._src.duration);
+                else {
+                    this._show(this._src.duration)
+                        .then(() => {
+                            this._playSessionToken = null;
+                            if (!this.autoplay)
+                                return;
+                            this._currentVideoTime = 0;
+                            this.play();
+                        });
+                }
             };
             MJPEGPlayer._promiseImmediate().then(next);
         });
@@ -163,6 +180,7 @@ interface VideoPlayable {
     play(): void;
     pause(): void;
     currentTime: number;
+    autoplay: boolean;
 
     videoWidth: number;
     videoHeight: number;

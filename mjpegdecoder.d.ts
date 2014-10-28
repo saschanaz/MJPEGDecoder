@@ -8,6 +8,8 @@
 }
 declare class MJPEGPlayer implements VideoPlayable {
     private static _promiseImmediate();
+    private _autoplay;
+    public autoplay : boolean;
     private _src;
     private _srcUrl;
     private _element;
@@ -34,6 +36,7 @@ interface VideoPlayable {
     play(): void;
     pause(): void;
     currentTime: number;
+    autoplay: boolean;
     videoWidth: number;
     videoHeight: number;
     duration: number;
