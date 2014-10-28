@@ -83,8 +83,11 @@ class MJPEGReader {
                 return this._consumeHdrl(stream);
             }).then((hdrlList) => {
                 riffData.mainHeader = hdrlList.mainHeader;
-                return this._consumeMovi(stream);
-            }).then((movi) => {
+                return this._consumeInfo(stream);
+            }).then(
+                () => this._consumeMovi(stream),
+                () => this._consumeMovi(stream)
+            ).then((movi) => {
                 riffData.movi = movi;
                 return this._consumeAVIIndex(stream);
             }).then((idx1) => {
@@ -145,6 +148,13 @@ class MJPEGReader {
                 return stream.seek(endPosition);
             }).then(() => {
                 return aviMainHeader;
+            });
+    }
+
+    private static _consumeInfo(stream: BlobStream) {
+        return this._consumeStructureHead(stream, "LIST", "INFO")
+            .then((structure) => {
+                return stream.seek(stream.byteOffset + structure.size);
             });
     }
 

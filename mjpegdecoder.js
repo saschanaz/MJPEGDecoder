@@ -318,6 +318,10 @@ var MJPEGReader = (function () {
             return _this._consumeHdrl(stream);
         }).then(function (hdrlList) {
             riffData.mainHeader = hdrlList.mainHeader;
+            return _this._consumeInfo(stream);
+        }).then(function () {
+            return _this._consumeMovi(stream);
+        }, function () {
             return _this._consumeMovi(stream);
         }).then(function (movi) {
             riffData.movi = movi;
@@ -378,6 +382,12 @@ var MJPEGReader = (function () {
             return stream.seek(endPosition);
         }).then(function () {
             return aviMainHeader;
+        });
+    };
+
+    MJPEGReader._consumeInfo = function (stream) {
+        return this._consumeStructureHead(stream, "LIST", "INFO").then(function (structure) {
+            return stream.seek(stream.byteOffset + structure.size);
         });
     };
 

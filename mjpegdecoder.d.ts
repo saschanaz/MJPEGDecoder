@@ -79,6 +79,7 @@ declare class MJPEGReader {
     private static _consumeRiff(stream);
     private static _consumeHdrl(stream);
     private static _consumeAVIMainHeader(stream);
+    private static _consumeInfo(stream);
     private static _consumeMovi(stream);
     private static _consumeAVIIndex(stream);
     private static _parseAVIIndex(stream, movi, idx1, onframeparse?);
