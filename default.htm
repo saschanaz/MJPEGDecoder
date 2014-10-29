@@ -33,6 +33,7 @@
         function decode() {
             player.src = URL.createObjectURL(loader.files[0], { oneTimeOnly: true });
             image.style.display = "";
+            player.play();
         }
     </script>
 </head>
@@ -40,14 +41,13 @@
     <h1>TypeScript HTML App</h1>
 
     <div id="content">
-        <label for="loader">Load File: </label><input name="loader" id="loader" type="file" />
-        <input type="button" value="Push to decode" onclick="decode()" />
+        <label for="loader">Load File: </label><input name="loader" id="loader" type="file" onchange="decode()" />
     </div>
     <div id="image" style="display: none;">
         <label for="timer">Time: </label><input name="timer" id="timer" type="number" value="0" onkeydown="if (event.key === 'Enter') showButton.click()" />
         <input type="button" id="showButton" value="Push to show image" onclick="player.currentTime = parseFloat(timer.value)" /><br />
-        <input type="button" id="playButton" value="Play" onclick="this.disabled = 'disabled'; stopButton.removeAttribute('disabled'); player.play()" />
-        <input type="button" id="stopButton" value="Stop" onclick="this.disabled = 'disabled'; playButton.removeAttribute('disabled'); player.pause()" disabled="disabled" /><br />
+        <input type="button" id="playButton" value="Play" onclick="this.disabled = 'disabled'; stopButton.removeAttribute('disabled'); player.play()" disabled="disabled" />
+        <input type="button" id="stopButton" value="Stop" onclick="this.disabled = 'disabled'; playButton.removeAttribute('disabled'); player.pause()" /><br />
     </div>
 </body>
 </html>
