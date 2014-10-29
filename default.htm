@@ -39,6 +39,7 @@
         function loadSample() {
             player.src = "sample/fingerfood.avi";
             image.style.display = "";
+            player.play();
         }
     </script>
 </head>
@@ -47,6 +48,7 @@
 
     <div id="content">
         <label for="loader">Load File: </label><input name="loader" id="loader" type="file" onchange="decode()" />
+        <input type="button" value="Load sample video" onclick="loadSample()" />
     </div>
     <div id="image" style="display: none;">
         <label for="timer">Time: </label><input name="timer" id="timer" type="number" value="0" onkeydown="if (event.key === 'Enter') showButton.click()" />
